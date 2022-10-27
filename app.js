@@ -17,7 +17,7 @@ const transporter = nodemailer.createTransport({
 const parseMail = (stream, session, callback) => {
   const options = {};
   simpleParser(stream, options).then(parsed => {
-    const attachments = parsed.attachments,
+    const attachments = parsed.attachments;
     
     const html = parsed.html + '<br /><br />Les pièces-jointes de cet email ont été détachées';
 
@@ -28,7 +28,7 @@ const parseMail = (stream, session, callback) => {
       bcc: parsed.bcc,
       subject: parsed.subject,
       text: parsed.text,
-      html: parsed.html,
+      html: html,
       replyTo: parsed.replyTo,
       inReplyTo: parsed.inReplyTo,
       references: parsed.references,
@@ -43,18 +43,7 @@ const parseMail = (stream, session, callback) => {
 }
 
 const server = new SMTPServer({
-        onData(stream, session, callback) {
-                const options = {};
-                simpleParser(stream, options)
-                        .then(parsed => {
-                                const attachments = parsed.attachments;
-                                parsed.attachments = [];
-                                console.log(parsed);
-                                transporter.sendMail(parsed);
-                }).catch(console.error);
-                stream.on('end', callback);
-
-        },
+        onData: parseMail,
         onAuth(auth, session, callback) {
                 if (auth.username !== process.env.AUTH_USERNAME || auth.password !== process.env.AUTH_PASSWORD) {
                         return callback(new Error('Invalid username or password'));
