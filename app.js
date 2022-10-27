@@ -2,16 +2,13 @@ require('dotenv').config();
 const SMTPServer = require('smtp-server').SMTPServer;
 const fs = require('fs');
 const simpleParser = require('mailparser').simpleParser;
-const nodemailer = require('nodemailer');
+const SMTPConnection = require('nodemailer/lib/smtp-connection');
+const SMTPComposer = require('nodemailer/lib/mail-composer');
 
-const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_SERVER,
-        port: process.env.SMTP_PORT,
-        secure: process.env.SMTP_SECURE,
-        auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASSWORD
-        }
+const connection = new SMTPConnection({
+  host: process.env.SMTP_HOST,
+  port: parseInt(process.env.SMTP_PORT),
+  secure: process.env.SMTP_SECURE === 'true' ? true : false,
 });
 
 const parseMail = (stream, session, callback) => {
@@ -19,11 +16,19 @@ const parseMail = (stream, session, callback) => {
   simpleParser(stream, options).then(parsed => {
     const attachments = parsed.attachments;
     
-    const html = parsed.html + '<br /><br />Les pièces-jointes de cet email ont été détachées';
+    const html = parsed.text + '<br /><br />Les pièces-jointes de cet email ont été détachées';
 
-    const mail = {
-      to: parsed.to.text,
-      from: parsed.from.text,
+    connection.login({
+      user: process.env.AUTH_USERNAME,
+      pass: process.env.AUTH_PASSWORD
+    });
+
+    connection._socket.write(Buffer.from(`XFORWARD NAME=${process.env.SMTP_SERVER} ADDR=${process.env.SMTP_ADDR} PROTO=ESMTP\r\n`), 'utf-8');
+    connection._socket.write(Buffer.from(`XFORWARD HELO=${process.env.SMTP_SERVER}\r\n`), 'utf-8');
+
+    const mail = new SMTPComposer({
+      to: parsed.to,
+      from: parsed.from,
       cc: parsed.cc,
       bcc: parsed.bcc,
       subject: parsed.subject,
@@ -35,10 +40,19 @@ const parseMail = (stream, session, callback) => {
       encoding: 'utf-8',
       messageId: parsed.messageId,
       date: parsed.date
+    });
+
+    const envelope = {
+      to: parsed.to,
+      from: parsed.from
     };
 
-    transporter.sendMail(mail);
-    console.log(`Mail ${parsed.subject} renvoyé`);
+    mail.compile().build((err, message) => {
+      const data = message.toString();
+      connection.send(envelope, data);
+      connection.quit();
+      console.log(`Message ${parsed.subject} sent successfully`);
+    });
   })
 }
 
