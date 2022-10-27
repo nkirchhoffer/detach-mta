@@ -23,8 +23,8 @@ const parseMail = (stream, session, callback) => {
       pass: process.env.AUTH_PASSWORD
     });
 
-    connection._socket.write(Buffer.from(`XFORWARD NAME=${process.env.SMTP_SERVER} ADDR=${process.env.SMTP_ADDR} PROTO=ESMTP\r\n`), 'utf-8');
-    connection._socket.write(Buffer.from(`XFORWARD HELO=${process.env.SMTP_SERVER}\r\n`), 'utf-8');
+    connection._socket.write(`XFORWARD NAME=${process.env.SMTP_SERVER} ADDR=${process.env.SMTP_ADDR} PROTO=ESMTP\r\n`, 'utf-8');
+    connection._socket.write(`XFORWARD HELO=${process.env.SMTP_SERVER}\r\n`, 'utf-8');
 
     const mail = new SMTPComposer({
       to: parsed.to,
