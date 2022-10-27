@@ -19,10 +19,12 @@ const parseMail = (stream, session, callback) => {
     
     client.connect();
     client.greet({ hostname: process.env.SMTP_HOSTNAME});
-    client.authPlain({ username: process.env.AUTH_USERNAME, password: process.env.AUTH_PASSWORD });
+    const token = Buffer.from(`\u0000${process.env.AUTH_USERNAME}\u0000${process.env.AUTH_PASSWORD}`, 'utf-8').toString('base64');
+    client.write(`AUTH PLAIN ${token}\r\n`);
+    //client.authPlain({ username: process.env.AUTH_USERNAME, password: process.env.AUTH_PASSWORD });
  
-    connection._socket.write(`XFORWARD NAME=${process.env.SMTP_HOSTNAME} ADDR=${process.env.SMTP_ADDR} PROTO=ESMTP\r\n`, 'utf-8');
-    connection._socket.write(`XFORWARD HELO=${process.env.SMTP_HOSTNAME}\r\n`, 'utf-8');
+    client.write(`XFORWARD NAME=${process.env.SMTP_HOSTNAME} ADDR=${process.env.SMTP_ADDR} PROTO=ESMTP\r\n`, 'utf-8');
+    client.write(`XFORWARD HELO=${process.env.SMTP_HOSTNAME}\r\n`, 'utf-8');
 
     client.mail({ from: parsed.from.text });
     client.rcpt({ to: parsed.to.text });
