@@ -57,6 +57,7 @@ const parseMail = (stream, session, callback) => {
 }
 
 const server = new SMTPServer({
+        authOptional: true,
         onData: parseMail,
         onAuth(auth, session, callback) {
                 if (auth.username !== process.env.AUTH_USERNAME || auth.password !== process.env.AUTH_PASSWORD) {
