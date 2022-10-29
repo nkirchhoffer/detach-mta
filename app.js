@@ -1,4 +1,4 @@
-equire('dotenv').config();
+require('dotenv').config();
 const SMTPServer = require('smtp-server').SMTPServer;
 const {constants} = require('crypto');
 const fs = require('fs');
