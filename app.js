@@ -5,7 +5,7 @@ const simpleParser = require('mailparser').simpleParser;
 const {SMTPChannel} = require('smtp-channel');
 const SMTPComposer = require('nodemailer/lib/mail-composer');
 
-const channel = new STMPChannel({
+const channel = new SMTPChannel({
   host: process.env.SMTP_SERVER,
   port: process.env.SMTP_PORT
 });
