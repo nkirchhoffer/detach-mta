@@ -2,7 +2,7 @@ require('dotenv').config();
 const SMTPServer = require('smtp-server').SMTPServer;
 const fs = require('fs');
 const simpleParser = require('mailparser').simpleParser;
-const {SMTPClient} = require('smtp-channel');
+const {SMTPChannel} = require('smtp-channel');
 const SMTPComposer = require('nodemailer/lib/mail-composer');
 
 const channel = new STMPChannel({
