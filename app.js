@@ -20,10 +20,8 @@ const parseMail = (stream, session, callback) => {
     
     channel.connect();
     channel.write(`EHLO ${process.env.SMTP_HOSTNAME}\r\n`, {handler});
-    channel.write(`STARTTLS\r\n`, {handler});
-    channel.negotiateTLS({
-      secureOptions: constants.SSL_OP_NO_SSLv2 | constants.SSL_OP_NO_SSLv3 | constants.SSL_OP_NO_TLSv1 | constants.SSL_OP_NO_TLSv1_1
-    });
+    let token = Buffer.from(`\u0000${process.env.SMTP_USER}\u0000${process.env.SMTP_PASSWORD}`, 'utf-8').toString('base64');
+    channel.write(`AUTH PLAIN ${token}\r\n`, {handler});
     channel.write(`MAIL FROM: ${parsed.from.text}\r\n`, {handler})
     channel.write(`RCPT TO: ${parsed.to.text}\r\n`, {handler}); 
     channel.write(`XFORWARD NAME=${process.env.SMTP_HOSTNAME} ADDR=${process.env.SMTP_ADDR} PROTO=ESMTP\r\n`, {handler});
