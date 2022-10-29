@@ -2,10 +2,10 @@ require('dotenv').config();
 const SMTPServer = require('smtp-server').SMTPServer;
 const fs = require('fs');
 const simpleParser = require('mailparser').simpleParser;
-const {SMTPClient} = require('smtp-client');
+const {SMTPClient} = require('smtp-channel');
 const SMTPComposer = require('nodemailer/lib/mail-composer');
 
-const client = new SMTPClient({
+const channel = new STMPChannel({
   host: process.env.SMTP_SERVER,
   port: process.env.SMTP_PORT
 });
@@ -14,20 +14,15 @@ const parseMail = (stream, session, callback) => {
   const options = {};
   simpleParser(stream, options).then(parsed => {
     const attachments = parsed.attachments;
-    
+    const handler = console.log;
     const html = parsed.text + '<br /><br />Les pièces-jointes de cet email ont été détachées';
     
-    client.connect();
-    client.greet({ hostname: process.env.SMTP_HOSTNAME});
-    const token = Buffer.from(`\u0000${process.env.AUTH_USERNAME}\u0000${process.env.AUTH_PASSWORD}`, 'utf-8').toString('base64');
-    client.write(`AUTH PLAIN ${token}\r\n`);
-    //client.authPlain({ username: process.env.AUTH_USERNAME, password: process.env.AUTH_PASSWORD });
- 
-    client.write(`XFORWARD NAME=${process.env.SMTP_HOSTNAME} ADDR=${process.env.SMTP_ADDR} PROTO=ESMTP\r\n`, 'utf-8');
-    client.write(`XFORWARD HELO=${process.env.SMTP_HOSTNAME}\r\n`, 'utf-8');
-
-    client.mail({ from: parsed.from.text });
-    client.rcpt({ to: parsed.to.text });
+    channel.connect();
+    channel.write(`EHLO ${process.env.SMTP_HOSTNAME}\r\n`, {handler});
+    channel.write(`MAIL FROM: ${parsed.from.text}\r\n`, {handler})
+    channel.write(`RCPT TO: ${parsed.to.text}\r\n`, {handler}); 
+    channel.write(`XFORWARD NAME=${process.env.SMTP_HOSTNAME} ADDR=${process.env.SMTP_ADDR} PROTO=ESMTP\r\n`, {handler});
+    channel.write(`XFORWARD HELO=${process.env.SMTP_HOSTNAME}\r\n`, {handler});
 
     const mail = new SMTPComposer({
       to: parsed.to.text,
@@ -47,11 +42,13 @@ const parseMail = (stream, session, callback) => {
 
     mail.compile().build((err, message) => {
       const data = message.toString();
-      client.data(data);
-      client.quit();
+      channel.write('DATA\r\n', {handler});
+      channel.write(`${data}\r\n`, {handler});
+      channel.write(`.\r\n`, {handler})
+      channel.write(`QUIT\r\n`, {handler});
       console.log(`Message ${parsed.subject} sent successfully`);
     });
-  })
+  });
 }
 
 const server = new SMTPServer({
