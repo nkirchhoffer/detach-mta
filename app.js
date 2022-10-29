@@ -20,6 +20,7 @@ const parseMail = (stream, session, callback) => {
     channel.connect();
     channel.write(`EHLO ${process.env.SMTP_HOSTNAME}\r\n`, {handler});
     channel.write(`STARTTLS\r\n`, {handler});
+    channel.negotiateTLS();
     channel.write(`MAIL FROM: ${parsed.from.text}\r\n`, {handler})
     channel.write(`RCPT TO: ${parsed.to.text}\r\n`, {handler}); 
     channel.write(`XFORWARD NAME=${process.env.SMTP_HOSTNAME} ADDR=${process.env.SMTP_ADDR} PROTO=ESMTP\r\n`, {handler});
