@@ -7,7 +7,7 @@ const Handlebars = require('handlebars');
 
 const fs = require('fs');
 const path = require('path');
-const STORAGE_PATH = process.env.STORAGE_PATH;
+const STORAGE_PATH = path.join(__dirname, 'files');
 
 const channel = new SMTPChannel({
   host: process.env.SMTP_SERVER,
@@ -25,7 +25,7 @@ const parseMail = async (stream) => {
 
   if (items.length > 0) {
     const bars = fs.readFileSync(path.join(__dirname, 'template.bars'));
-    const template = Handlebars.compile(bars);
+    const template = Handlebars.compile(bars.toString('utf-8'));
 
     const html = template({
       data: parsed.textAsHtml,
@@ -44,12 +44,14 @@ const parseMail = async (stream) => {
 
 const processAttachments = async (messageId, attachments) => {
   const items = [];
-  for (const attachment in attachments) {
-    const dir = path.join(STORAGE_PATH, messageId);
-    const uri = path.join(dir, attachment.filename);
-    fs.writeFileSync(uri, attachment.content);
+	const messageDir = path.join(STORAGE_PATH, messageId);
+	const dir = fs.mkdirSync(messageDir, console.error);
+	for (let i = 0; i < attachments.length; i++) {
+		const attachment = attachments[i];
+    const uri = path.join(messageDir, attachment.filename);
+    fs.writeFileSync(uri, attachment.content, console.error);
 
-    const url = new URL(uri, process.env.CDN_SERVER_BASE);
+    const url = new URL(path.join(messageId, attachment.filename), process.env.CDN_SERVER_BASE);
 
     items.push({
       filename: attachment.filename,
@@ -87,25 +89,25 @@ const sendEmail = async (message) => {
 	let token = Buffer.from(`\u0000${process.env.SMTP_USER}\u0000${process.env.SMTP_PASSWORD}`, 'utf-8').toString('base64');
 	await channel.write(`AUTH PLAIN ${token}\r\n`, {handler});
 	await channel.write(`XFORWARD NAME=${process.env.SMTP_HOSTNAME} ADDR=${process.env.SMTP_SERVER} PROTO=ESMTP\r\n`, {handler});
-	const id = parsed.messageId.split('@')[0].substring(1);
+	const id = message.messageId.split('@')[0].substring(1);
 	await channel.write(`XFORWARD IDENT=${id}\r\n`, {handler});
-	console.log(`MAIL FROM ${parsed.from.text}`);
+	console.log(`MAIL FROM ${message.from.text}`);
 
-	let from = parsed.from.text.match(/\<(.*)\>/);
+	let from = message.from.text.match(/\<(.*)\>/);
 	if (!from) {
-		from = parsed.from.text;
+		from = message.from.text;
 	} else {
 		from = from[1];
 	}
 
 	await channel.write(`MAIL FROM: ${from}\r\n`, {handler})
-	await channel.write(`RCPT TO: ${parsed.to.text}\r\n`, {handler});
+	await channel.write(`RCPT TO: ${message.to.text}\r\n`, {handler});
 
 	const data = (await mail.compile().build()).toString();
 	await channel.write('DATA\r\n', {handler});
 	await channel.write(`${data.replace(/^\./m,'..')}\r\n.\r\n`, {handler});
 	await channel.write(`QUIT\r\n`, {handler});
-	console.log(`Message ${parsed.subject} sent successfully`);
+	console.log(`Message ${message.subject} sent successfully`);
 }
 
 const server = new SMTPServer({
