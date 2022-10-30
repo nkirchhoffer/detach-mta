@@ -73,6 +73,19 @@ Approche Detach MTA : fichier de taille N, hébergé sur un serveur unique (ou r
     	Postfix(Postfix) --3. SMTP-->MTA2[MTA]
     ```
     
+## Bugs
+
+- **Réinjection du MTA vers Postfix**
+
+  Une fois le mail entrant traité par notre MTA, le but est de le réinjecter dans Postfix pour qu'il soit envoyé au MTA (puis MDA) du destinataire.
+
+  Actuellement, le mail est réinjecté dans Postfix mais celui-ci ne fait pas le lien entre le mail sortant du MTA et le mail entrant du client utilisateur.
+
+  Pistes possibles :
+  - Mauvaise utilisation des commandes **XFORWARD** : permet d'indiquer au serveur l'origine du mail qu'il reçoit via un proxy
+  - Mauvaise configuration de Postfix : manque de headers permettant à Postfix de retrouver le client d'origine
+
+  Le mail est bien envoyé vers le MTA/MDA destinataire. Le client utilisateur n'est cependant pas informé de l'opération et reçoit un `bounce`.
 
 ## Progression
 
