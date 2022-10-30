@@ -1,4 +1,12 @@
-# État actuel du projet
+# Detach MTA
+
+Un Mail Transfer Agent (MTA) qui se connecte à Postfix et détache les pièces-jointes des mails pour les uploader sur un CDN.
+
+Approche historique RFC 821 : fichier de taille N, envoyé à X destinataires, empreinte totale du fichier sur les serveurs IMAP : X * N
+
+Approche Detach MTA : fichier de taille N, hébergé sur un serveur unique (ou répliqué), lien (L/N) envoyé à X personnes, empreinte totale du fichier : N (CDN, sans prise en compte de réplication), X * L/N (texte de max 100 caractères = <1 Ko par destinataire)  
+
+## État actuel du projet
 
 - Serveur mail fonctionnel (SMTP/IMAP) sur un serveur hébergé par OVH
     - SMTP: mail.clebard.cloud, port 983, STARTTLS
@@ -6,7 +14,7 @@
     - webmail: https://webmail.clebard.cloud
 - Postfix envoie les mails au [proxy before_queue](http://www.postfix.org/SMTPD_PROXY_README.html) “fait maison” qui récupère le contenu du mail via un stream, le parse, récupère les attachments (= pièces-jointes) et renvoie le mail sans celles-ci
 
-# Approches
+## Approches
 
 1. **Utiliser le paramètre `relayhost` pour envoyer les mails entrants à un serveur qu’on écrit nous-mêmes**
     
@@ -66,11 +74,11 @@
     ```
     
 
-# Progression
+## Progression
 
 - 27/10 : début de l’implémentation du `before-queue filter`
 - 30/10 : débugage + refactor code + traitement des PJ
 
-# Dépôt GitHub
+## Dépôt GitHub
 
 - [https://github.com/nkirchhoffer/detach-mta](https://github.com/nkirchhoffer/detach-mta)
