@@ -45,7 +45,7 @@ const parseMail = async (stream) => {
 const processAttachments = async (messageId, attachments) => {
   const items = [];
 	const messageDir = path.join(STORAGE_PATH, messageId);
-	const dir = fs.mkdirSync(messageDir, console.error);
+	fs.mkdirSync(messageDir, console.error);
 	for (let i = 0; i < attachments.length; i++) {
 		const attachment = attachments[i];
     const uri = path.join(messageDir, attachment.filename);
@@ -113,15 +113,15 @@ const sendEmail = async (message) => {
 const server = new SMTPServer({
         authOptional: true,
         onData: async (stream, session, callback) => {
-            const mail = await parseMail(stream);
+          const mail = await parseMail(stream);
 
-            await sendEmail(mail);
+          await sendEmail(mail);
         },
         onAuth(auth, session, callback) {
-                if (auth.username !== process.env.AUTH_USERNAME || auth.password !== process.env.AUTH_PASSWORD) {
-                        return callback(new Error('Invalid username or password'));
-                }
-                callback(null, { user: '123' });
+          if (auth.username !== process.env.AUTH_USERNAME || auth.password !== process.env.AUTH_PASSWORD) {
+            return callback(new Error('Invalid username or password'));
+          }
+          callback(null, { user: '123' });
         }
 });
 
