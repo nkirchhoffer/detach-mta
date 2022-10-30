@@ -18,7 +18,7 @@ const handler = console.log;
 const parseMail = async (stream) => {
   const options = {};
   const parsed = await simpleParser(stream, options)
-	const attachments = parsed.attachments;
+  const attachments = parsed.attachments;
 
   const id = parsed.messageId.split('@')[0].substring(1)
   const items = await processAttachments(id, attachments);
@@ -44,10 +44,10 @@ const parseMail = async (stream) => {
 
 const processAttachments = async (messageId, attachments) => {
   const items = [];
-	const messageDir = path.join(STORAGE_PATH, messageId);
-	fs.mkdirSync(messageDir, console.error);
-	for (let i = 0; i < attachments.length; i++) {
-		const attachment = attachments[i];
+  const messageDir = path.join(STORAGE_PATH, messageId);
+  fs.mkdirSync(messageDir, console.error);
+  for (let i = 0; i < attachments.length; i++) {
+    const attachment = attachments[i];
     const uri = path.join(messageDir, attachment.filename);
     fs.writeFileSync(uri, attachment.content, console.error);
 
@@ -64,20 +64,20 @@ const processAttachments = async (messageId, attachments) => {
 
 const sendEmail = async (message) => {
   const mail = new SMTPComposer({
-		to: message.to.text,
-		from: message.from.text,
-		cc: message.cc,
-		bcc: message.bcc,
-		subject: message.subject,
-		text: message.text,
-		html: message.html,
-		replyTo: message.replyTo,
-		inReplyTo: message.inReplyTo,
-		references: message.references,
-		encoding: 'utf-8',
-		messageId: message.messageId,
-		date: message.date
-	});
+    to: message.to.text,
+    from: message.from.text,
+    cc: message.cc,
+    bcc: message.bcc,
+    subject: message.subject,
+    text: message.text,
+    html: message.html,
+    replyTo: message.replyTo,
+    inReplyTo: message.inReplyTo,
+    references: message.references,
+    encoding: 'utf-8',
+    messageId: message.messageId,
+    date: message.date
+  });
 
   /**
    * BEGINNING OF SMTP TRANSMISSION
@@ -85,44 +85,44 @@ const sendEmail = async (message) => {
    * XFORWARD FOR POSTFIX PROXY
    */
   await channel.connect();
-	await channel.write(`EHLO ${process.env.SMTP_HOSTNAME}\r\n`, {handler});
-	let token = Buffer.from(`\u0000${process.env.SMTP_USER}\u0000${process.env.SMTP_PASSWORD}`, 'utf-8').toString('base64');
-	await channel.write(`AUTH PLAIN ${token}\r\n`, {handler});
-	await channel.write(`XFORWARD NAME=${process.env.SMTP_HOSTNAME} ADDR=${process.env.SMTP_SERVER} PROTO=ESMTP\r\n`, {handler});
-	const id = message.messageId.split('@')[0].substring(1);
-	await channel.write(`XFORWARD IDENT=${id}\r\n`, {handler});
-	console.log(`MAIL FROM ${message.from.text}`);
+  await channel.write(`EHLO ${process.env.SMTP_HOSTNAME}\r\n`, {handler});
+  let token = Buffer.from(`\u0000${process.env.SMTP_USER}\u0000${process.env.SMTP_PASSWORD}`, 'utf-8').toString('base64');
+  await channel.write(`AUTH PLAIN ${token}\r\n`, {handler});
+  await channel.write(`XFORWARD NAME=${process.env.SMTP_HOSTNAME} ADDR=${process.env.SMTP_SERVER} PROTO=ESMTP\r\n`, {handler});
+  const id = message.messageId.split('@')[0].substring(1);
+  await channel.write(`XFORWARD IDENT=${id}\r\n`, {handler});
+  console.log(`MAIL FROM ${message.from.text}`);
 
-	let from = message.from.text.match(/\<(.*)\>/);
-	if (!from) {
-		from = message.from.text;
-	} else {
-		from = from[1];
-	}
+  let from = message.from.text.match(/\<(.*)\>/);
+  if (!from) {
+    from = message.from.text;
+  } else {
+    from = from[1];
+  }
 
-	await channel.write(`MAIL FROM: ${from}\r\n`, {handler})
-	await channel.write(`RCPT TO: ${message.to.text}\r\n`, {handler});
+  await channel.write(`MAIL FROM: ${from}\r\n`, {handler})
+  await channel.write(`RCPT TO: ${message.to.text}\r\n`, {handler});
 
-	const data = (await mail.compile().build()).toString();
-	await channel.write('DATA\r\n', {handler});
-	await channel.write(`${data.replace(/^\./m,'..')}\r\n.\r\n`, {handler});
-	await channel.write(`QUIT\r\n`, {handler});
-	console.log(`Message ${message.subject} sent successfully`);
+  const data = (await mail.compile().build()).toString();
+  await channel.write('DATA\r\n', {handler});
+  await channel.write(`${data.replace(/^\./m,'..')}\r\n.\r\n`, {handler});
+  await channel.write(`QUIT\r\n`, {handler});
+  console.log(`Message ${message.subject} sent successfully`);
 }
 
 const server = new SMTPServer({
-        authOptional: true,
-        onData: async (stream, session, callback) => {
-          const mail = await parseMail(stream);
+  authOptional: true,
+  onData: async (stream, session, callback) => {
+    const mail = await parseMail(stream);
 
-          await sendEmail(mail);
-        },
-        onAuth(auth, session, callback) {
-          if (auth.username !== process.env.AUTH_USERNAME || auth.password !== process.env.AUTH_PASSWORD) {
-            return callback(new Error('Invalid username or password'));
-          }
-          callback(null, { user: '123' });
-        }
+    await sendEmail(mail);
+  },
+  onAuth(auth, session, callback) {
+    if (auth.username !== process.env.AUTH_USERNAME || auth.password !== process.env.AUTH_PASSWORD) {
+      return callback(new Error('Invalid username or password'));
+    }
+    callback(null, { user: '123' });
+  }
 });
 
 server.listen(9830);
