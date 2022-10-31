@@ -89,7 +89,7 @@ const sendEmail = async (message) => {
   let token = Buffer.from(`\u0000${process.env.SMTP_USER}\u0000${process.env.SMTP_PASSWORD}`, 'utf-8').toString('base64');
   await channel.write(`AUTH PLAIN ${token}\r\n`, {handler});
 
-  const received = parsed.headers.received;
+  const received = message.headers.received;
   const sender = received.split('(').split(' ');
   const hostname = sender[0];
   const addr = sender[1].substr(1,sender[1].length-3);
