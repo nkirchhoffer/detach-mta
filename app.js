@@ -28,7 +28,7 @@ const parseMail = async (stream) => {
     const template = Handlebars.compile(bars.toString('utf-8'));
 
     const html = template({
-      data: parsed.textAsHtml,
+      data: parsed.html,
       count: items.length,
       one: items.length === 1 ? 1 : 0,
       items
@@ -38,7 +38,7 @@ const parseMail = async (stream) => {
     return parsed;
   }
 
-  parsed.html = parsed.textAsHtml;
+  parsed.html = parsed.html;
   return parsed;
 }
 
@@ -88,7 +88,13 @@ const sendEmail = async (message) => {
   await channel.write(`EHLO ${process.env.SMTP_HOSTNAME}\r\n`, {handler});
   let token = Buffer.from(`\u0000${process.env.SMTP_USER}\u0000${process.env.SMTP_PASSWORD}`, 'utf-8').toString('base64');
   await channel.write(`AUTH PLAIN ${token}\r\n`, {handler});
-  await channel.write(`XFORWARD NAME=${process.env.SMTP_HOSTNAME} ADDR=${process.env.SMTP_SERVER} PROTO=ESMTP\r\n`, {handler});
+
+  const received = parsed.headers.received;
+  const sender = received.split('(').split(' ');
+  const hostname = sender[0];
+  const addr = sender[1].substr(1,sender[1].length-3);
+
+  await channel.write(`XFORWARD NAME=${hostname} ADDR=${addr} PROTO=ESMTP\r\n`, {handler});
   const id = message.messageId.split('@')[0].substring(1);
   await channel.write(`XFORWARD IDENT=${id}\r\n`, {handler});
   console.log(`MAIL FROM ${message.from.text}`);
