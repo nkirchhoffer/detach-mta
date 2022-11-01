@@ -4,6 +4,7 @@ const {simpleParser} = require('mailparser');
 const {SMTPChannel} = require('smtp-channel');
 const SMTPComposer = require('nodemailer/lib/mail-composer');
 const Handlebars = require('handlebars');
+const { JSDOM } = require('jsdom');
 
 const fs = require('fs');
 const path = require('path');
@@ -28,13 +29,19 @@ const parseMail = async (stream) => {
     const template = Handlebars.compile(bars.toString('utf-8'));
 
     const html = template({
-      data: parsed.html,
       count: items.length,
       one: items.length === 1 ? 1 : 0,
       items
     });
 
-    parsed.html = html;
+		const dom = new JSDOM(parsed.html);
+		const body = dom.window.document.querySelector('body');
+		const detachment = new JSDOM(html);
+
+		console.log(detachment.window.document.querySelector('body'));
+		body.appendChild(detachment.window.document.querySelector('body'));
+
+    parsed.html = dom.serialize();
     return parsed;
   }
 
@@ -85,18 +92,17 @@ const sendEmail = async (message) => {
    * XFORWARD FOR POSTFIX PROXY
    */
   await channel.connect();
-  await channel.write(`EHLO ${process.env.SMTP_HOSTNAME}\r\n`, {handler});
+  await channel.write(`HELO ${process.env.SMTP_HOSTNAME}\r\n`, {handler});
   let token = Buffer.from(`\u0000${process.env.SMTP_USER}\u0000${process.env.SMTP_PASSWORD}`, 'utf-8').toString('base64');
   await channel.write(`AUTH PLAIN ${token}\r\n`, {handler});
 
-  const received = message.headers.received;
-  const sender = received.split('(').split(' ');
+  const received = message.headers.get('received');
+  const sender = received.split('(')[1].split(' ');
   const hostname = sender[0];
   const addr = sender[1].substr(1,sender[1].length-3);
 
-  await channel.write(`XFORWARD NAME=${hostname} ADDR=${addr} PROTO=ESMTP\r\n`, {handler});
-  const id = message.messageId.split('@')[0].substring(1);
-  await channel.write(`XFORWARD IDENT=${id}\r\n`, {handler});
+  await channel.write(`XFORWARD HELO=${hostname} NAME=${hostname} ADDR=${addr} PROTO=SMTP\r\n`, {handler});
+  await channel.write(`XFORWARD IDENT=${message.messageId}\r\n`, {handler});
   console.log(`MAIL FROM ${message.from.text}`);
 
   let from = message.from.text.match(/\<(.*)\>/);
