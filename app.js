@@ -5,10 +5,13 @@ const {SMTPChannel} = require('smtp-channel');
 const SMTPComposer = require('nodemailer/lib/mail-composer');
 const Handlebars = require('handlebars');
 const { JSDOM } = require('jsdom');
+const IPFS  = require('ipfs-core');
+
 
 const fs = require('fs');
 const path = require('path');
 const STORAGE_PATH = path.join(__dirname, 'files');
+const IPFS_PREFIX = "https://ipfs.io/ipfs/";
 
 const channel = new SMTPChannel({
   host: process.env.SMTP_SERVER,
@@ -23,7 +26,7 @@ const parseMail = async (stream) => {
 
   const id = parsed.messageId.split('@')[0].substring(1)
   const items = await processAttachments(id, attachments);
-
+  
   if (items.length > 0) {
     const bars = fs.readFileSync(path.join(__dirname, 'template.bars'));
     const template = Handlebars.compile(bars.toString('utf-8'));
@@ -52,6 +55,8 @@ const parseMail = async (stream) => {
 const processAttachments = async (messageId, attachments) => {
   const items = [];
   const messageDir = path.join(STORAGE_PATH, messageId);
+  const ipfs = await IPFS.create();
+
   fs.mkdirSync(messageDir, console.error);
   for (let i = 0; i < attachments.length; i++) {
     const attachment = attachments[i];
@@ -60,11 +65,33 @@ const processAttachments = async (messageId, attachments) => {
 
     const url = new URL(path.join(messageId, attachment.filename), process.env.CDN_SERVER_BASE);
 
+    //TODO : avoid add file path to returned items when ipfs will be ready
     items.push({
       filename: attachment.filename,
       url: url.href
     });
   }
+
+
+  //options specific to globSource
+  const globSourceOptions = {
+    recursive: true
+  };
+  //example options to pass to IPFS
+  const addOptions = {
+    pin: true,
+    wrapWithDirectory: true,
+    timeout: 10000
+  };
+  for await (const file of ipfs.addAll(IPFS.globSource(messageDir, globSourceOptions), addOptions)) {
+    const { cid } = file;
+    const url = new URL(cid, IPFS_PREFIX);
+    items.push({
+      filename: attachment.filename,
+      url: url.href
+    });
+  }
+
 
   return items;
 }
