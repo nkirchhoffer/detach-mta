@@ -5,8 +5,7 @@ const {SMTPChannel} = require('smtp-channel');
 const SMTPComposer = require('nodemailer/lib/mail-composer');
 const Handlebars = require('handlebars');
 const { JSDOM } = require('jsdom');
-const IPFS  = require('ipfs-core');
-
+const IPFS = require('ipfs');
 
 const fs = require('fs');
 const path = require('path');
@@ -66,10 +65,7 @@ const processAttachments = async (messageId, attachments) => {
     const url = new URL(path.join(messageId, attachment.filename), process.env.CDN_SERVER_BASE);
 
     //TODO : avoid add file path to returned items when ipfs will be ready
-    items.push({
-      filename: attachment.filename,
-      url: url.href
-    });
+     
   }
 
 
