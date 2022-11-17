@@ -1,15 +1,17 @@
-require('dotenv').config();
-const {SMTPServer} = require('smtp-server');
-const {simpleParser} = require('mailparser');
-const {SMTPChannel} = require('smtp-channel');
-const SMTPComposer = require('nodemailer/lib/mail-composer');
-const Handlebars = require('handlebars');
-const { JSDOM } = require('jsdom');
-const IPFS = require('ipfs');
-
-const fs = require('fs');
-const path = require('path');
-const STORAGE_PATH = path.join(__dirname, 'files');
+// BEGIN REWRITE
+import 'dotenv/config';
+import { SMTPServer } from 'smtp-server';
+import { simpleParser } from 'mailparser';
+import { SMTPChannel } from 'smtp-channel';
+import SMTPComposer from 'nodemailer/lib/mail-composer/index.js';
+import Handlebars from 'handlebars';
+import { JSDOM } from 'jsdom';
+import * as IPFS from 'ipfs';
+import fs from 'fs';
+import path from 'path';
+// END REWRITE
+ 
+const STORAGE_PATH = path.join('.', 'files');
 const IPFS_PREFIX = "https://ipfs.io/ipfs/";
 
 const channel = new SMTPChannel({
@@ -27,7 +29,7 @@ const parseMail = async (stream) => {
   const items = await processAttachments(id, attachments);
   
   if (items.length > 0) {
-    const bars = fs.readFileSync(path.join(__dirname, 'template.bars'));
+    const bars = fs.readFileSync(path.join('.', 'template.bars'));
     const template = Handlebars.compile(bars.toString('utf-8'));
 
     const html = template({
