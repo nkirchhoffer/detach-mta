@@ -1,9 +1,16 @@
 {{ data }}
+{{#if isAttach}}
 <hr />
-<b>{{ count }}</b> {{#if one}}pièce-jointe a été détachée{{else}}pièces-jointes ont été détachées{{/if}} de cet e-mail :
+<b>{{ countAttach }}</b>
+{{#if isOneAttach}} pièce-jointe a été détachée {{else}} pièces-jointes ont été détachées {{/if}}
+de cet e-mail :
 <br />
 <ul>
   {{#each items as | item |}}
   <li><a href="{{ url }}">{{ filename }}</a></li>
   {{/each}}
 </ul>
+{{#if isSavedSpace}}
+Le traitement 'don't tach my docs' a permis d'économiser {{savedSpace}}.
+{{/if}}
+{{/if}}

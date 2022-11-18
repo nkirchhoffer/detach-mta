@@ -15,10 +15,30 @@ const channel = new SMTPChannel({
 });
 const handler = console.log;
 
+/**
+ * Count the number of recipients (to, cc, bcc) of an email
+ * @param {*} message 
+ * @returns 
+ */
+const countRecipient = (message) => {
+  //TODO
+  return 1;
+}
+/**
+ * Count the size of all attached documents of an email
+ * @param {*} message 
+ * @returns string
+ */
+const countSizeAttach = (message) => {
+  //TODO
+  return '3Ko';
+}
+
 const parseMail = async (stream) => {
   const options = {};
   const parsed = await simpleParser(stream, options)
   const attachments = parsed.attachments;
+  const savedSpace = '';
 
   const id = parsed.messageId.split('@')[0].substring(1)
   const items = await processAttachments(id, attachments);
@@ -27,9 +47,16 @@ const parseMail = async (stream) => {
     const bars = fs.readFileSync(path.join('.', 'template.html.hbs'));
     const template = Handlebars.compile(bars.toString('utf-8'));
 
+    if (countRecipient(parsed) > 1){
+      savedSpace = countSizeAttach(parsed);
+    }
+
     const html = template({
-      count: items.length,
-      one: items.length === 1 ? 1 : 0,
+      isSavedSpace: savedSpace != '',
+      savedSpace : savedSpace,
+      isAttach:  items.length > 1 ? 1 : 0,
+      isOneAttach: items.length === 1 ? 1 : 0,
+      countAttach: items.length,
       items
     });
 
@@ -70,6 +97,8 @@ const processAttachments = async (_, attachments) => {
   }
   return items;
 }
+
+parsed.to
 
 const sendEmail = async (message) => {
   const mail = new SMTPComposer({
