@@ -58,19 +58,6 @@ const processAttachments = async (messageId, attachments) => {
   const messageDir = path.join(STORAGE_PATH, messageId);
   const ipfs = await IPFS.create();
 
-  fs.mkdirSync(messageDir, console.error);
-  for (let i = 0; i < attachments.length; i++) {
-    const attachment = attachments[i];
-    const uri = path.join(messageDir, attachment.filename);
-    fs.writeFileSync(uri, attachment.content, console.error);
-
-    const url = new URL(path.join(messageId, attachment.filename), process.env.CDN_SERVER_BASE);
-
-    //TODO : avoid add file path to returned items when ipfs will be ready
-     
-  }
-
-
   //options specific to globSource
   const globSourceOptions = {
     recursive: true
@@ -81,16 +68,17 @@ const processAttachments = async (messageId, attachments) => {
     wrapWithDirectory: true,
     timeout: 10000
   };
-  for await (const file of ipfs.addAll(IPFS.globSource(messageDir, globSourceOptions), addOptions)) {
-    const { cid } = file;
-    const url = new URL(cid, IPFS_PREFIX);
-    items.push({
-      filename: attachment.filename,
-      url: url.href
+
+  for (let i = 0; i < attachments.length; i++) {
+    const attachment = attachments[i];
+    const uri = path.join(messageDir, attachment.filename);
+		const ret = await ipfs.add(attachment.content);
+    const url = new URL(ret.path, IPFS_PREFIX);
+		items.push({
+			filename: attachment.filename,
+			url: url.href
     });
-  }
-
-
+	}
   return items;
 }
 
