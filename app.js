@@ -21,8 +21,7 @@ const handler = console.log;
  * @returns 
  */
 const countRecipient = (message) => {
-  //TODO
-  return 1;
+  return message.to.value.length + message.cc.value.length + message.bcc.value.length;
 }
 /**
  * Count the size of all attached documents of an email
@@ -30,8 +29,27 @@ const countRecipient = (message) => {
  * @returns string
  */
 const countSizeAttach = (message) => {
+  var fileSize = "";
+  try {
+    for (let i = 0; i < message.attachments.length; i++) {
+      const attachment = message.attachments[i];
+      const { size } = fs.statSync(attachment.path);
+      fileSize += size;
+    }
+  } catch (error) {
+    console.error(error);
+  }
+  return parseFileSize(fileSize);
+}
+
+/**
+ * Parse size to a readable size
+ * @param {*} size 
+ * @returns 
+ */
+const parseFileSize = (size) => {
   //TODO
-  return '3Ko';
+  return "3Ko"
 }
 
 const parseMail = async (stream) => {
@@ -47,14 +65,14 @@ const parseMail = async (stream) => {
     const bars = fs.readFileSync(path.join('.', 'template.html.hbs'));
     const template = Handlebars.compile(bars.toString('utf-8'));
 
-    if (countRecipient(parsed) > 1){
+    if (countRecipient(parsed) > 1) {
       savedSpace = countSizeAttach(parsed);
     }
 
     const html = template({
       isSavedSpace: savedSpace != '',
-      savedSpace : savedSpace,
-      isAttach:  items.length > 1 ? 1 : 0,
+      savedSpace: savedSpace,
+      isAttach: items.length > 1 ? 1 : 0,
       isOneAttach: items.length === 1 ? 1 : 0,
       countAttach: items.length,
       items
@@ -97,8 +115,6 @@ const processAttachments = async (_, attachments) => {
   }
   return items;
 }
-
-parsed.to
 
 const sendEmail = async (message) => {
   const mail = new SMTPComposer({
