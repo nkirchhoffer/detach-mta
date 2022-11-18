@@ -10,7 +10,7 @@ import * as IPFS from 'ipfs';
 import fs from 'fs';
 import path from 'path';
 // END REWRITE
- 
+
 const STORAGE_PATH = path.join('.', 'files');
 const IPFS_PREFIX = "https://ipfs.io/ipfs/";
 
@@ -27,7 +27,7 @@ const parseMail = async (stream) => {
 
   const id = parsed.messageId.split('@')[0].substring(1)
   const items = await processAttachments(id, attachments);
-  
+
   if (items.length > 0) {
     const bars = fs.readFileSync(path.join('.', 'template.bars'));
     const template = Handlebars.compile(bars.toString('utf-8'));
@@ -38,12 +38,12 @@ const parseMail = async (stream) => {
       items
     });
 
-		const dom = new JSDOM(parsed.html);
-		const body = dom.window.document.querySelector('body');
-		const detachment = new JSDOM(html);
+    const dom = new JSDOM(parsed.html);
+    const body = dom.window.document.querySelector('body');
+    const detachment = new JSDOM(html);
 
-		console.log(detachment.window.document.querySelector('body'));
-		body.appendChild(detachment.window.document.querySelector('body'));
+    console.log(detachment.window.document.querySelector('body'));
+    body.appendChild(detachment.window.document.querySelector('body'));
 
     parsed.html = dom.serialize();
     return parsed;
@@ -54,16 +54,11 @@ const parseMail = async (stream) => {
 }
 
 const processAttachments = async (messageId, attachments) => {
+  const ipfsNode = await IPFS.create();
   const items = [];
-  const messageDir = path.join(STORAGE_PATH, messageId);
-  const ipfs = await IPFS.create();
 
-  //options specific to globSource
-  const globSourceOptions = {
-    recursive: true
-  };
-  //example options to pass to IPFS
   const addOptions = {
+    onlyHash: false,
     pin: true,
     wrapWithDirectory: true,
     timeout: 10000
@@ -71,14 +66,13 @@ const processAttachments = async (messageId, attachments) => {
 
   for (let i = 0; i < attachments.length; i++) {
     const attachment = attachments[i];
-    const uri = path.join(messageDir, attachment.filename);
-		const ret = await ipfs.add(attachment.content);
-    const url = new URL(ret.path, IPFS_PREFIX);
-		items.push({
-			filename: attachment.filename,
-			url: url.href
+    const { path: cidPath } = await ipfsNode.add(attachment.content, addOptions);
+    const url = new URL(cidPath, IPFS_PREFIX);
+    items.push({
+      filename: attachment.filename,
+      url: url.href
     });
-	}
+  }
   return items;
 }
 
@@ -105,17 +99,17 @@ const sendEmail = async (message) => {
    * XFORWARD FOR POSTFIX PROXY
    */
   await channel.connect();
-  await channel.write(`HELO ${process.env.SMTP_HOSTNAME}\r\n`, {handler});
+  await channel.write(`HELO ${process.env.SMTP_HOSTNAME}\r\n`, { handler });
   let token = Buffer.from(`\u0000${process.env.SMTP_USER}\u0000${process.env.SMTP_PASSWORD}`, 'utf-8').toString('base64');
-  await channel.write(`AUTH PLAIN ${token}\r\n`, {handler});
+  await channel.write(`AUTH PLAIN ${token}\r\n`, { handler });
 
   const received = message.headers.get('received');
   const sender = received.split('(')[1].split(' ');
   const hostname = sender[0];
-  const addr = sender[1].substr(1,sender[1].length-3);
+  const addr = sender[1].substr(1, sender[1].length - 3);
 
-  await channel.write(`XFORWARD HELO=${hostname} NAME=${hostname} ADDR=${addr} PROTO=SMTP\r\n`, {handler});
-  await channel.write(`XFORWARD IDENT=${message.messageId}\r\n`, {handler});
+  await channel.write(`XFORWARD HELO=${hostname} NAME=${hostname} ADDR=${addr} PROTO=SMTP\r\n`, { handler });
+  await channel.write(`XFORWARD IDENT=${message.messageId}\r\n`, { handler });
   console.log(`MAIL FROM ${message.from.text}`);
 
   let from = message.from.text.match(/\<(.*)\>/);
@@ -125,13 +119,13 @@ const sendEmail = async (message) => {
     from = from[1];
   }
 
-  await channel.write(`MAIL FROM: ${from}\r\n`, {handler})
-  await channel.write(`RCPT TO: ${message.to.text}\r\n`, {handler});
+  await channel.write(`MAIL FROM: ${from}\r\n`, { handler })
+  await channel.write(`RCPT TO: ${message.to.text}\r\n`, { handler });
 
   const data = (await mail.compile().build()).toString();
-  await channel.write('DATA\r\n', {handler});
-  await channel.write(`${data.replace(/^\./m,'..')}\r\n.\r\n`, {handler});
-  await channel.write(`QUIT\r\n`, {handler});
+  await channel.write('DATA\r\n', { handler });
+  await channel.write(`${data.replace(/^\./m, '..')}\r\n.\r\n`, { handler });
+  await channel.write(`QUIT\r\n`, { handler });
   console.log(`Message ${message.subject} sent successfully`);
 }
 
