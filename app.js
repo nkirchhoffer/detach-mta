@@ -1,4 +1,3 @@
-// BEGIN REWRITE
 import 'dotenv/config';
 import { SMTPServer } from 'smtp-server';
 import { simpleParser } from 'mailparser';
@@ -9,10 +8,6 @@ import { JSDOM } from 'jsdom';
 import * as IPFS from 'ipfs';
 import fs from 'fs';
 import path from 'path';
-// END REWRITE
-
-const STORAGE_PATH = path.join('.', 'files');
-const IPFS_PREFIX = "https://ipfs.io/ipfs/";
 
 const channel = new SMTPChannel({
   host: process.env.SMTP_SERVER,
@@ -29,7 +24,7 @@ const parseMail = async (stream) => {
   const items = await processAttachments(id, attachments);
 
   if (items.length > 0) {
-    const bars = fs.readFileSync(path.join('.', 'template.bars'));
+    const bars = fs.readFileSync(path.join('.', 'template.html.hbs'));
     const template = Handlebars.compile(bars.toString('utf-8'));
 
     const html = template({
@@ -42,7 +37,7 @@ const parseMail = async (stream) => {
     const body = dom.window.document.querySelector('body');
     const detachment = new JSDOM(html);
 
-    console.log(detachment.window.document.querySelector('body'));
+    console.log("detachment.window.documen : \n" + detachment.window.document.querySelector('body'));
     body.appendChild(detachment.window.document.querySelector('body'));
 
     parsed.html = dom.serialize();
@@ -53,7 +48,7 @@ const parseMail = async (stream) => {
   return parsed;
 }
 
-const processAttachments = async (messageId, attachments) => {
+const processAttachments = async (_, attachments) => {
   const ipfsNode = await IPFS.create();
   const items = [];
 
@@ -67,7 +62,7 @@ const processAttachments = async (messageId, attachments) => {
   for (let i = 0; i < attachments.length; i++) {
     const attachment = attachments[i];
     const { path: cidPath } = await ipfsNode.add(attachment.content, addOptions);
-    const url = new URL(cidPath, IPFS_PREFIX);
+    const url = new URL(cidPath, process.env.IPFS_PREFIX);
     items.push({
       filename: attachment.filename,
       url: url.href
