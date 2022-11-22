@@ -5,7 +5,7 @@ import { SMTPChannel } from 'smtp-channel';
 import SMTPComposer from 'nodemailer/lib/mail-composer/index.js';
 import Handlebars from 'handlebars';
 import { JSDOM } from 'jsdom';
-import * as IPFS from 'ipfs';
+import { create } from 'ipfs-http-client';
 import fs from 'fs';
 import path from 'path';
 
@@ -49,20 +49,24 @@ const parseMail = async (stream) => {
 }
 
 const processAttachments = async (_, attachments) => {
-  const ipfsNode = await IPFS.create();
+  const ipfsNode = create({
+    host: '127.0.0.1',
+    port: '5001',
+    protocole: 'http',
+  })
   const items = [];
 
   const addOptions = {
     onlyHash: false,
     pin: true,
-    wrapWithDirectory: true,
+    wrapWithDirectory: false,
     timeout: 10000
   };
 
   for (let i = 0; i < attachments.length; i++) {
     const attachment = attachments[i];
-    const { path: cidPath } = await ipfsNode.add(attachment.content, addOptions);
-    const url = new URL(cidPath, process.env.IPFS_PREFIX);
+    const result = await ipfsNode.add(attachment.content, addOptions)
+    const url = new URL(result.cid, process.env.IPFS_PREFIX);
     items.push({
       filename: attachment.filename,
       url: url.href
@@ -93,8 +97,8 @@ const sendEmail = async (message) => {
    * COMMANDS EXPLAINED ON RFC 821
    * XFORWARD FOR POSTFIX PROXY
    */
-  await channel.connect();
-  await channel.write(`HELO ${process.env.SMTP_HOSTNAME}\r\n`, { handler });
+  await channel.connect({ handler, timeout: 3000 });
+  await channel.write(`EHLO ${process.env.SMTP_HOSTNAME}\r\n`, { handler });
   let token = Buffer.from(`\u0000${process.env.SMTP_USER}\u0000${process.env.SMTP_PASSWORD}`, 'utf-8').toString('base64');
   await channel.write(`AUTH PLAIN ${token}\r\n`, { handler });
 
@@ -103,8 +107,8 @@ const sendEmail = async (message) => {
   const hostname = sender[0];
   const addr = sender[1].substr(1, sender[1].length - 3);
 
-  await channel.write(`XFORWARD HELO=${hostname} NAME=${hostname} ADDR=${addr} PROTO=SMTP\r\n`, { handler });
-  await channel.write(`XFORWARD IDENT=${message.messageId}\r\n`, { handler });
+  //await channel.write(`XFORWARD HELO=${hostname} NAME=${hostname} ADDR=${addr} PROTO=ESMTP\r\n`, { handler });
+  //await channel.write(`XFORWARD IDENT=${message.messageId}\r\n`, { handler });
   console.log(`MAIL FROM ${message.from.text}`);
 
   let from = message.from.text.match(/\<(.*)\>/);
@@ -114,13 +118,16 @@ const sendEmail = async (message) => {
     from = from[1];
   }
 
+  channel.on('close', () => console.log('Channel has been closed'));
+
   await channel.write(`MAIL FROM: ${from}\r\n`, { handler })
   await channel.write(`RCPT TO: ${message.to.text}\r\n`, { handler });
 
   const data = (await mail.compile().build()).toString();
   await channel.write('DATA\r\n', { handler });
   await channel.write(`${data.replace(/^\./m, '..')}\r\n.\r\n`, { handler });
-  await channel.write(`QUIT\r\n`, { handler });
+  await channel.write('QUIT\r\n', { handler })
+  await channel.close();
   console.log(`Message ${message.subject} sent successfully`);
 }
 
