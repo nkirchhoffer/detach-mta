@@ -1,14 +1,13 @@
-require('dotenv').config();
-const {SMTPServer} = require('smtp-server');
-const {simpleParser} = require('mailparser');
-const {SMTPChannel} = require('smtp-channel');
-const SMTPComposer = require('nodemailer/lib/mail-composer');
-const Handlebars = require('handlebars');
-const { JSDOM } = require('jsdom');
-
-const fs = require('fs');
-const path = require('path');
-const STORAGE_PATH = path.join(__dirname, 'files');
+import 'dotenv/config';
+import { SMTPServer } from 'smtp-server';
+import { simpleParser } from 'mailparser';
+import { SMTPChannel } from 'smtp-channel';
+import SMTPComposer from 'nodemailer/lib/mail-composer/index.js';
+import Handlebars from 'handlebars';
+import { JSDOM } from 'jsdom';
+import { create } from 'ipfs-http-client';
+import fs from 'fs';
+import path from 'path';
 
 const channel = new SMTPChannel({
   host: process.env.SMTP_SERVER,
@@ -25,7 +24,7 @@ const parseMail = async (stream) => {
   const items = await processAttachments(id, attachments);
 
   if (items.length > 0) {
-    const bars = fs.readFileSync(path.join(__dirname, 'template.bars'));
+    const bars = fs.readFileSync(path.join('.', 'template.html.hbs'));
     const template = Handlebars.compile(bars.toString('utf-8'));
 
     const html = template({
@@ -34,12 +33,12 @@ const parseMail = async (stream) => {
       items
     });
 
-		const dom = new JSDOM(parsed.html);
-		const body = dom.window.document.querySelector('body');
-		const detachment = new JSDOM(html);
+    const dom = new JSDOM(parsed.html);
+    const body = dom.window.document.querySelector('body');
+    const detachment = new JSDOM(html);
 
-		console.log(detachment.window.document.querySelector('body'));
-		body.appendChild(detachment.window.document.querySelector('body'));
+    console.log("detachment.window.documen : \n" + detachment.window.document.querySelector('body'));
+    body.appendChild(detachment.window.document.querySelector('body'));
 
     parsed.html = dom.serialize();
     return parsed;
@@ -49,23 +48,30 @@ const parseMail = async (stream) => {
   return parsed;
 }
 
-const processAttachments = async (messageId, attachments) => {
+const processAttachments = async (_, attachments) => {
+  const ipfsNode = create({
+    host: '127.0.0.1',
+    port: '5001',
+    protocole: 'http',
+  })
   const items = [];
-  const messageDir = path.join(STORAGE_PATH, messageId);
-  fs.mkdirSync(messageDir, console.error);
+
+  const addOptions = {
+    onlyHash: false,
+    pin: true,
+    wrapWithDirectory: false,
+    timeout: 10000
+  };
+
   for (let i = 0; i < attachments.length; i++) {
     const attachment = attachments[i];
-    const uri = path.join(messageDir, attachment.filename);
-    fs.writeFileSync(uri, attachment.content, console.error);
-
-    const url = new URL(path.join(messageId, attachment.filename), process.env.CDN_SERVER_BASE);
-
+    const result = await ipfsNode.add(attachment.content, addOptions)
+    const url = new URL(result.cid, process.env.IPFS_PREFIX);
     items.push({
       filename: attachment.filename,
       url: url.href
     });
   }
-
   return items;
 }
 
@@ -91,18 +97,18 @@ const sendEmail = async (message) => {
    * COMMANDS EXPLAINED ON RFC 821
    * XFORWARD FOR POSTFIX PROXY
    */
-  await channel.connect();
-  await channel.write(`HELO ${process.env.SMTP_HOSTNAME}\r\n`, {handler});
+  await channel.connect({ handler, timeout: 3000 });
+  await channel.write(`EHLO ${process.env.SMTP_HOSTNAME}\r\n`, { handler });
   let token = Buffer.from(`\u0000${process.env.SMTP_USER}\u0000${process.env.SMTP_PASSWORD}`, 'utf-8').toString('base64');
-  await channel.write(`AUTH PLAIN ${token}\r\n`, {handler});
+  await channel.write(`AUTH PLAIN ${token}\r\n`, { handler });
 
   const received = message.headers.get('received');
   const sender = received.split('(')[1].split(' ');
   const hostname = sender[0];
-  const addr = sender[1].substr(1,sender[1].length-3);
+  const addr = sender[1].substr(1, sender[1].length - 3);
 
-  await channel.write(`XFORWARD HELO=${hostname} NAME=${hostname} ADDR=${addr} PROTO=SMTP\r\n`, {handler});
-  await channel.write(`XFORWARD IDENT=${message.messageId}\r\n`, {handler});
+  //await channel.write(`XFORWARD HELO=${hostname} NAME=${hostname} ADDR=${addr} PROTO=ESMTP\r\n`, { handler });
+  //await channel.write(`XFORWARD IDENT=${message.messageId}\r\n`, { handler });
   console.log(`MAIL FROM ${message.from.text}`);
 
   let from = message.from.text.match(/\<(.*)\>/);
@@ -112,13 +118,16 @@ const sendEmail = async (message) => {
     from = from[1];
   }
 
-  await channel.write(`MAIL FROM: ${from}\r\n`, {handler})
-  await channel.write(`RCPT TO: ${message.to.text}\r\n`, {handler});
+  channel.on('close', () => console.log('Channel has been closed'));
+
+  await channel.write(`MAIL FROM: ${from}\r\n`, { handler })
+  await channel.write(`RCPT TO: ${message.to.text}\r\n`, { handler });
 
   const data = (await mail.compile().build()).toString();
-  await channel.write('DATA\r\n', {handler});
-  await channel.write(`${data.replace(/^\./m,'..')}\r\n.\r\n`, {handler});
-  await channel.write(`QUIT\r\n`, {handler});
+  await channel.write('DATA\r\n', { handler });
+  await channel.write(`${data.replace(/^\./m, '..')}\r\n.\r\n`, { handler });
+  await channel.write('QUIT\r\n', { handler })
+  await channel.close();
   console.log(`Message ${message.subject} sent successfully`);
 }
 

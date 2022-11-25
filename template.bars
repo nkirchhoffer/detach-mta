@@ -1,6 +1,0 @@
-{{ data }}
-<hr />
-<b>{{ count }}</b> {{#if one}}pièce-jointe a été détachée de cet e-mail{{else}}pièces-jointes ont été détachées de cet e-mail{{/if}}<br />
-{{#each items as | item |}}
-  <a href="{{ url }}">{{ filename }}</a>
-{{/each}}
