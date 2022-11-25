@@ -1,68 +1,140 @@
 require('dotenv').config();
-const SMTPServer = require('smtp-server').SMTPServer;
-const fs = require('fs');
-const simpleParser = require('mailparser').simpleParser;
-const {SMTPClient} = require('smtp-client');
+const {SMTPServer} = require('smtp-server');
+const {simpleParser} = require('mailparser');
+const {SMTPChannel} = require('smtp-channel');
 const SMTPComposer = require('nodemailer/lib/mail-composer');
+const Handlebars = require('handlebars');
+const { JSDOM } = require('jsdom');
 
-const client = new SMTPClient({
+const fs = require('fs');
+const path = require('path');
+const STORAGE_PATH = path.join(__dirname, 'files');
+
+const channel = new SMTPChannel({
   host: process.env.SMTP_SERVER,
   port: process.env.SMTP_PORT
 });
+const handler = console.log;
 
-const parseMail = (stream, session, callback) => {
+const parseMail = async (stream) => {
   const options = {};
-  simpleParser(stream, options).then(parsed => {
-    const attachments = parsed.attachments;
-    
-    const html = parsed.text + '<br /><br />Les pièces-jointes de cet email ont été détachées';
-    
-    client.connect();
-    client.greet({ hostname: process.env.SMTP_HOSTNAME});
-    const token = Buffer.from(`\u0000${process.env.AUTH_USERNAME}\u0000${process.env.AUTH_PASSWORD}`, 'utf-8').toString('base64');
-    client.write(`AUTH PLAIN ${token}\r\n`);
-    //client.authPlain({ username: process.env.AUTH_USERNAME, password: process.env.AUTH_PASSWORD });
- 
-    client.write(`XFORWARD NAME=${process.env.SMTP_HOSTNAME} ADDR=${process.env.SMTP_ADDR} PROTO=ESMTP\r\n`, 'utf-8');
-    client.write(`XFORWARD HELO=${process.env.SMTP_HOSTNAME}\r\n`, 'utf-8');
+  const parsed = await simpleParser(stream, options)
+  const attachments = parsed.attachments;
 
-    client.mail({ from: parsed.from.text });
-    client.rcpt({ to: parsed.to.text });
+  const id = parsed.messageId.split('@')[0].substring(1)
+  const items = await processAttachments(id, attachments);
 
-    const mail = new SMTPComposer({
-      to: parsed.to.text,
-      from: parsed.from.text,
-      cc: parsed.cc,
-      bcc: parsed.bcc,
-      subject: parsed.subject,
-      text: parsed.text,
-      html: html,
-      replyTo: parsed.replyTo,
-      inReplyTo: parsed.inReplyTo,
-      references: parsed.references,
-      encoding: 'utf-8',
-      messageId: parsed.messageId,
-      date: parsed.date
+  if (items.length > 0) {
+    const bars = fs.readFileSync(path.join(__dirname, 'template.bars'));
+    const template = Handlebars.compile(bars.toString('utf-8'));
+
+    const html = template({
+      count: items.length,
+      one: items.length === 1 ? 1 : 0,
+      items
     });
 
-    mail.compile().build((err, message) => {
-      const data = message.toString();
-      client.data(data);
-      client.quit();
-      console.log(`Message ${parsed.subject} sent successfully`);
+		const dom = new JSDOM(parsed.html);
+		const body = dom.window.document.querySelector('body');
+		const detachment = new JSDOM(html);
+
+		console.log(detachment.window.document.querySelector('body'));
+		body.appendChild(detachment.window.document.querySelector('body'));
+
+    parsed.html = dom.serialize();
+    return parsed;
+  }
+
+  parsed.html = parsed.html;
+  return parsed;
+}
+
+const processAttachments = async (messageId, attachments) => {
+  const items = [];
+  const messageDir = path.join(STORAGE_PATH, messageId);
+  fs.mkdirSync(messageDir, console.error);
+  for (let i = 0; i < attachments.length; i++) {
+    const attachment = attachments[i];
+    const uri = path.join(messageDir, attachment.filename);
+    fs.writeFileSync(uri, attachment.content, console.error);
+
+    const url = new URL(path.join(messageId, attachment.filename), process.env.CDN_SERVER_BASE);
+
+    items.push({
+      filename: attachment.filename,
+      url: url.href
     });
-  })
+  }
+
+  return items;
+}
+
+const sendEmail = async (message) => {
+  const mail = new SMTPComposer({
+    to: message.to.text,
+    from: message.from.text,
+    cc: message.cc,
+    bcc: message.bcc,
+    subject: message.subject,
+    text: message.text,
+    html: message.html,
+    replyTo: message.replyTo,
+    inReplyTo: message.inReplyTo,
+    references: message.references,
+    encoding: 'utf-8',
+    messageId: message.messageId,
+    date: message.date
+  });
+
+  /**
+   * BEGINNING OF SMTP TRANSMISSION
+   * COMMANDS EXPLAINED ON RFC 821
+   * XFORWARD FOR POSTFIX PROXY
+   */
+  await channel.connect();
+  await channel.write(`HELO ${process.env.SMTP_HOSTNAME}\r\n`, {handler});
+  let token = Buffer.from(`\u0000${process.env.SMTP_USER}\u0000${process.env.SMTP_PASSWORD}`, 'utf-8').toString('base64');
+  await channel.write(`AUTH PLAIN ${token}\r\n`, {handler});
+
+  const received = message.headers.get('received');
+  const sender = received.split('(')[1].split(' ');
+  const hostname = sender[0];
+  const addr = sender[1].substr(1,sender[1].length-3);
+
+  await channel.write(`XFORWARD HELO=${hostname} NAME=${hostname} ADDR=${addr} PROTO=SMTP\r\n`, {handler});
+  await channel.write(`XFORWARD IDENT=${message.messageId}\r\n`, {handler});
+  console.log(`MAIL FROM ${message.from.text}`);
+
+  let from = message.from.text.match(/\<(.*)\>/);
+  if (!from) {
+    from = message.from.text;
+  } else {
+    from = from[1];
+  }
+
+  await channel.write(`MAIL FROM: ${from}\r\n`, {handler})
+  await channel.write(`RCPT TO: ${message.to.text}\r\n`, {handler});
+
+  const data = (await mail.compile().build()).toString();
+  await channel.write('DATA\r\n', {handler});
+  await channel.write(`${data.replace(/^\./m,'..')}\r\n.\r\n`, {handler});
+  await channel.write(`QUIT\r\n`, {handler});
+  console.log(`Message ${message.subject} sent successfully`);
 }
 
 const server = new SMTPServer({
-        authOptional: true,
-        onData: parseMail,
-        onAuth(auth, session, callback) {
-                if (auth.username !== process.env.AUTH_USERNAME || auth.password !== process.env.AUTH_PASSWORD) {
-                        return callback(new Error('Invalid username or password'));
-                }
-                callback(null, { user: '123' });
-        }
+  authOptional: true,
+  onData: async (stream, session, callback) => {
+    const mail = await parseMail(stream);
+
+    await sendEmail(mail);
+  },
+  onAuth(auth, session, callback) {
+    if (auth.username !== process.env.AUTH_USERNAME || auth.password !== process.env.AUTH_PASSWORD) {
+      return callback(new Error('Invalid username or password'));
+    }
+    callback(null, { user: '123' });
+  }
 });
 
 server.listen(9830);
