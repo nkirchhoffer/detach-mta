@@ -3,7 +3,11 @@ const nodeIpfsApi = require('ipfs-api');
 const milter = require('milter');
 
 // Créez une nouvelle instance de milter
-const mf = milter.create();
+//const mf = milter.create();
+const mf = new milter.Milter({
+  tempFailureOnConnect: true,
+  rejectOnTempFail: true,
+});
 
 // Connexion à IPFS
 const ipfs = nodeIpfsApi('localhost', '5001');
