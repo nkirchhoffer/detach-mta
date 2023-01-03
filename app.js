@@ -15,7 +15,7 @@ mf.on('message', (ctx, data) => {
 
   // Parcourez toutes les pièces jointes du message électronique
   ctx.parts.forEach(async (part) => {
-    // Vérifiez si la pièce jointe est un fichier (et non une image ou autre)
+    // Vérifiez si la pièce jointe est un fichier
     if (part.filename) {
       // Récupérez la taille du fichier
       const fileSize = await fs.promises.stat(part.path).size;
@@ -34,10 +34,13 @@ mf.on('message', (ctx, data) => {
     }
   });
 
-  // Modifiez le corps du message électronique pour y ajouter les liens IPFS et la taille totale des pièces jointes
+  // Modifiez le corps du message électronique pour y ajouter les liens IPFS, la taille totale des pièces jointes et le nombre de destinataires
   ctx.modify((header, body) => {
     // Calculez la taille totale des pièces jointes
     const totalSize = ipfsLinks.reduce((acc, link) => acc + link.size, 0);
+
+    // Récupérez le nombre de destinataires
+    const recipients = header.getAddresses('to').length + header.getAddresses('cc').length + header.getAddresses('bcc').length;
 
     // Ajoutez les liens IPFS et la taille totale des pièces jointes au corps du message électronique
     body.push(`\n\nPièces jointes téléchargées sur IPFS:\n`);
@@ -45,6 +48,7 @@ mf.on('message', (ctx, data) => {
       body.push(`${link.link} (${link.size} bytes)\n`);
     });
     body.push(`\nTaille totale des pièces jointes: ${totalSize} bytes`);
+    body.push(`\nEspace de stockage économisé: ${totalSize*(recipients-1)} bytes`);
 
     return;
   });
