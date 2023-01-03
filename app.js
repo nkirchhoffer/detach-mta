@@ -1,149 +1,54 @@
-import 'dotenv/config';
-import { SMTPServer } from 'smtp-server';
-import { simpleParser } from 'mailparser';
-import { SMTPChannel } from 'smtp-channel';
-import SMTPComposer from 'nodemailer/lib/mail-composer/index.js';
-import Handlebars from 'handlebars';
-import { JSDOM } from 'jsdom';
-import { create } from 'ipfs-http-client';
-import fs from 'fs';
-import path from 'path';
+const fs = require('fs');
+const nodeIpfsApi = require('ipfs-api');
+const milter = require('milter');
 
-const channel = new SMTPChannel({
-  host: process.env.SMTP_SERVER,
-  port: process.env.SMTP_PORT
-});
-const handler = console.log;
+// Créez une nouvelle instance de milter
+const mf = milter.create();
 
-const parseMail = async (stream) => {
-  const options = {};
-  const parsed = await simpleParser(stream, options)
-  const attachments = parsed.attachments;
+// Connexion à IPFS
+const ipfs = nodeIpfsApi('localhost', '5001');
 
-  const id = parsed.messageId.split('@')[0].substring(1)
-  const items = await processAttachments(id, attachments);
+// Fonction de callback qui sera appelée lorsque le milter reçoit un nouveau message électronique
+mf.on('message', (ctx, data) => {
+  // Créez un tableau pour stocker les liens IPFS des pièces jointes téléchargées
+  let ipfsLinks = [];
 
-  if (items.length > 0) {
-    const bars = fs.readFileSync(path.join('.', 'template.html.hbs'));
-    const template = Handlebars.compile(bars.toString('utf-8'));
+  // Parcourez toutes les pièces jointes du message électronique
+  ctx.parts.forEach(async (part) => {
+    // Vérifiez si la pièce jointe est un fichier (et non une image ou autre)
+    if (part.filename) {
+      // Récupérez la taille du fichier
+      const fileSize = await fs.promises.stat(part.path).size;
 
-    const html = template({
-      count: items.length,
-      one: items.length === 1 ? 1 : 0,
-      items
-    });
+      // Lisez le fichier en mémoire
+      const fileBuffer = await fs.promises.readFile(part.path);
 
-    const dom = new JSDOM(parsed.html);
-    const body = dom.window.document.querySelector('body');
-    const detachment = new JSDOM(html);
+      // Téléchargez le fichier sur IPFS
+      const ipfsResponse = await ipfs.add(fileBuffer);
 
-    console.log("detachment.window.documen : \n" + detachment.window.document.querySelector('body'));
-    body.appendChild(detachment.window.document.querySelector('body'));
+      // Récupérez le lien IPFS du fichier téléchargé
+      const ipfsLink = `https://ipfs.io/ipfs/${ipfsResponse[0].hash}`;
 
-    parsed.html = dom.serialize();
-    return parsed;
-  }
-
-  parsed.html = parsed.html;
-  return parsed;
-}
-
-const processAttachments = async (_, attachments) => {
-  const ipfsNode = create({
-    host: '127.0.0.1',
-    port: '5001',
-    protocole: 'http',
-  })
-  const items = [];
-
-  const addOptions = {
-    onlyHash: false,
-    pin: true,
-    wrapWithDirectory: false,
-    timeout: 10000
-  };
-
-  for (let i = 0; i < attachments.length; i++) {
-    const attachment = attachments[i];
-    const result = await ipfsNode.add(attachment.content, addOptions)
-    const url = new URL(result.cid, process.env.IPFS_PREFIX);
-    items.push({
-      filename: attachment.filename,
-      url: url.href
-    });
-  }
-  return items;
-}
-
-const sendEmail = async (message) => {
-  const mail = new SMTPComposer({
-    to: message.to.text,
-    from: message.from.text,
-    cc: message.cc,
-    bcc: message.bcc,
-    subject: message.subject,
-    text: message.text,
-    html: message.html,
-    replyTo: message.replyTo,
-    inReplyTo: message.inReplyTo,
-    references: message.references,
-    encoding: 'utf-8',
-    messageId: message.messageId,
-    date: message.date
+      // Ajoutez le lien IPFS et la taille du fichier au tableau
+      ipfsLinks.push({ link: ipfsLink, size: fileSize });
+    }
   });
 
-  /**
-   * BEGINNING OF SMTP TRANSMISSION
-   * COMMANDS EXPLAINED ON RFC 821
-   * XFORWARD FOR POSTFIX PROXY
-   */
-  await channel.connect({ handler, timeout: 3000 });
-  await channel.write(`EHLO ${process.env.SMTP_HOSTNAME}\r\n`, { handler });
-  let token = Buffer.from(`\u0000${process.env.SMTP_USER}\u0000${process.env.SMTP_PASSWORD}`, 'utf-8').toString('base64');
-  await channel.write(`AUTH PLAIN ${token}\r\n`, { handler });
+  // Modifiez le corps du message électronique pour y ajouter les liens IPFS et la taille totale des pièces jointes
+  ctx.modify((header, body) => {
+    // Calculez la taille totale des pièces jointes
+    const totalSize = ipfsLinks.reduce((acc, link) => acc + link.size, 0);
 
-  const received = message.headers.get('received');
-  const sender = received.split('(')[1].split(' ');
-  const hostname = sender[0];
-  const addr = sender[1].substr(1, sender[1].length - 3);
+    // Ajoutez les liens IPFS et la taille totale des pièces jointes au corps du message électronique
+    body.push(`\n\nPièces jointes téléchargées sur IPFS:\n`);
+    ipfsLinks.forEach((link) => {
+      body.push(`${link.link} (${link.size} bytes)\n`);
+    });
+    body.push(`\nTaille totale des pièces jointes: ${totalSize} bytes`);
 
-  //await channel.write(`XFORWARD HELO=${hostname} NAME=${hostname} ADDR=${addr} PROTO=ESMTP\r\n`, { handler });
-  //await channel.write(`XFORWARD IDENT=${message.messageId}\r\n`, { handler });
-  console.log(`MAIL FROM ${message.from.text}`);
-
-  let from = message.from.text.match(/\<(.*)\>/);
-  if (!from) {
-    from = message.from.text;
-  } else {
-    from = from[1];
-  }
-
-  channel.on('close', () => console.log('Channel has been closed'));
-
-  await channel.write(`MAIL FROM: ${from}\r\n`, { handler })
-  await channel.write(`RCPT TO: ${message.to.text}\r\n`, { handler });
-
-  const data = (await mail.compile().build()).toString();
-  await channel.write('DATA\r\n', { handler });
-  await channel.write(`${data.replace(/^\./m, '..')}\r\n.\r\n`, { handler });
-  await channel.write('QUIT\r\n', { handler })
-  await channel.close();
-  console.log(`Message ${message.subject} sent successfully`);
-}
-
-const server = new SMTPServer({
-  authOptional: true,
-  onData: async (stream, session, callback) => {
-    const mail = await parseMail(stream);
-
-    await sendEmail(mail);
-  },
-  onAuth(auth, session, callback) {
-    if (auth.username !== process.env.AUTH_USERNAME || auth.password !== process.env.AUTH_PASSWORD) {
-      return callback(new Error('Invalid username or password'));
-    }
-    callback(null, { user: '123' });
-  }
+    return;
+  });
 });
 
-server.listen(9830);
+// Démarrez le milter
+mf.listen();
