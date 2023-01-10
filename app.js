@@ -1,31 +1,18 @@
-const fs = require('fs');
-const nodeIpfsApi = require('ipfs-api');
-const milter = require('milter');
-
-// Créez une nouvelle instance de milter
-//const mf = milter.create();
-const mf = new milter.Milter({
-  tempFailureOnConnect: true,
-  rejectOnTempFail: true,
-});
+const fs = import('fs');
+const nodeIpfsApi = import('ipfs-api');
 
 // Connexion à IPFS
 const ipfs = nodeIpfsApi('localhost', '5001');
-
-// Fonction de callback qui sera appelée lorsque le milter reçoit un nouveau message électronique
-mf.on('message', (ctx, data) => {
-  // Créer un tableau pour stocker les liens IPFS générés
-  let ipfsLinks = addAttachmentsToIPFS(ctx.parts);
-
-  // Modifiez le corps du message électronique pour y ajouter les liens IPFS, la taille totale des pièces jointes et le nombre de destinataires
-  ctx.modify((header, body) => {
-    modifyEmailBody(header, body, ipfsLinks);
-    return;
-  });
-});
-
-// Démarrez le milter
-mf.listen();
+const header = {
+  getAddresses: () => ['toto.mail']
+}
+let body = "Hello see my attachment"
+const attachments = [{
+  filename : 'bim.txt',
+  path:'mock'
+}]
+let ipfsLinks = addAttachmentsToIPFS(attachments);
+modifyEmailBody(header, body, ipfsLinks);
 
 /**
  * Fonction pour encrypter les pièces jointes avec AES-256-CTR

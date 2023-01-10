@@ -4,6 +4,7 @@
     "dotenv": "^16.0.3",
     "handlebars": "^4.7.7",
     "ipfs": "^0.65.0",
+    "ipfs-api": "^26.1.2",
     "ipfs-core": "^0.17.0",
     "jsdom": "^20.0.2",
     "mailparser": "^3.5.0",
