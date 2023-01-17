@@ -12,9 +12,11 @@ const addOptions = {
   timeout: 10000,
 };
 
+//////TODO : REPLACE BY MAIN BRANCH////////
 // Mail details
 const header = {
   getAddresses: (_) => ["mock@mail.com"],
+  //getAddresses: (arg) => arg == 'to' ? ["mock@mail.com"] : [],
 };
 let body = "Hello see my attachment";
 const attachments = [
@@ -23,11 +25,12 @@ const attachments = [
     path: "mock",
   },
 ];
+//////////////////////////////////////////
 
 // Detach documents
 try {
   let ipfsLinks = await addAttachmentsToIPFS(attachments);
-  if (ipfsLinks.length > 0) modifyEmailBody(header, body, ipfsLinks);
+  if (ipfsLinks.length > 0) body = modifyEmailBody(header, body, ipfsLinks);
   console.log(body);
   console.log("Done");
 } catch (error) {
@@ -57,7 +60,7 @@ function encryptAttachment(object, iv, key) {
 /**
  * Fonction pour ajouter des fichiers à IPFS
  * @param {{filename:string, path:string}[]} attachments
- * @returns {{filename:string, url:string, size:string, encryptVector: string, encryptKey: string }[]}
+ * @returns {Promise<{filename:string, url:string, size:string, encryptVector: string, encryptKey: string }[]>}
  */
 async function addAttachmentsToIPFS(attachments) {
   // Créez un tableau pour stocker les liens IPFS des pièces jointes téléchargées
@@ -69,42 +72,57 @@ async function addAttachmentsToIPFS(attachments) {
     // Génèrez une clé aléatoire pour le chiffrement
     const key = randomBytes(32);
 
+    const allAsyncResultsP = [];
     // Parcourez toutes les pièces jointes du message électronique
-    attachments.forEach(async (attachment) => {
-      // Vérifiez si la pièce jointe est un fichier
-      if (attachment.filename) {
-        const filePath = attachment.path
-          ? `${attachment.path}/${attachment.filename}`
-          : attachment.filename;
+    for (const attachment of attachments) {
+      const asyncResultP = addAttachmentToIPFS(iv, key, attachment);
+      // Ajoutez le lien IPFS et la taille du fichier au tableau
+      allAsyncResultsP.push(asyncResultP);
+    }
 
-        // Récupérez la taille du fichier
-        const fileSize = (await promises.stat(filePath)).size;
-
-        // Lisez le fichier en mémoire
-        const fileBuffer = await promises.readFile(filePath);
-
-        // Encryptez le fichier
-        const encryptedFile = encryptAttachment(fileBuffer, iv, key);
-
-        // Téléchargez le fichier sur IPFS
-        const ipfsResponse = await ipfsNode.add(encryptedFile, addOptions);
-
-        // Récupérez le lien IPFS du fichier téléchargé
-        const ipfsURL = new URL(ipfsResponse.cid, process.env.IPFS_PREFIX);
-
-        // Ajoutez le lien IPFS et la taille du fichier au tableau
-        ipfsLinks.push({
-          filename: attachment.filename,
-          url: ipfsURL.toString(),
-          size: fileSize,
-          encryptVector: iv,
-          encryptKey: key,
-        });
-      }
-    });
+    // Résolvez les promesses du tableau
+    ipfsLinks = await Promise.all(allAsyncResultsP);
   }
-
   return ipfsLinks;
+}
+
+/**
+ * Fonction pour encrypter et ajouter un fichier à IPFS
+ * @param {string} iv
+ * @param {string} key
+ * @param {{filename:string, path:string}} attachment
+ * @returns {Promise<{filename:string, url:string, size:string, encryptVector: string, encryptKey: string }>}
+ */
+async function addAttachmentToIPFS(iv, key, attachment) {
+  // Vérifiez si la pièce jointe est un fichier
+  if (attachment.filename) {
+    const filePath = attachment.path
+      ? `${attachment.path}/${attachment.filename}`
+      : attachment.filename;
+
+    // Récupérez la taille du fichier
+    const fileSize = (await promises.stat(filePath)).size;
+
+    // Lisez le fichier en mémoire
+    const fileBuffer = await promises.readFile(filePath);
+
+    // Encryptez le fichier
+    const encryptedFile = encryptAttachment(fileBuffer, iv, key);
+
+    // Téléchargez le fichier sur IPFS
+    const ipfsResponse = await ipfsNode.add(encryptedFile, addOptions);
+
+    // Récupérez le lien IPFS du fichier téléchargé
+    const ipfsURL = new URL(ipfsResponse.cid, process.env.IPFS_PREFIX);
+
+    return {
+      filename: attachment.filename,
+      url: ipfsURL.toString(),
+      size: fileSize,
+      encryptVector: iv,
+      encryptKey: key,
+    };
+  }
 }
 
 /**
@@ -132,9 +150,9 @@ function modifyEmailBody(header, body, ipfsLinks) {
     - ${link.filename}
       Lien: ${link.url}
       Taille: ${link.size} bytes
-      Clé: ${link.encryptKey.toString("hex")}
-      IV: ${link.encryptVector.toString("hex")}
-    `;
+      `;
+      // Clé: ${link.encryptKey.toString("hex")}
+      // IV: ${link.encryptVector.toString("hex")}
     body = body.concat(`${fileDetails}`);
   });
 
@@ -147,11 +165,12 @@ function modifyEmailBody(header, body, ipfsLinks) {
   // Ajoutez des instructions d'accès
   const decryptionInstructions = `
     \n\nPour déchiffrer les pièces-jointes, veuillez suivre ces étapes :
-    1. Téléchargez les pièces-jointes à partir des liens ci-dessous
-    2. Utilisez la clé (Clé) et le vecteur d'initialisation (IV) suivants pour déchiffrer les pièces-jointes avec l'algorithme AES-256-CTR
-    Clé : ${ipfsLinks[0].encryptKey.toString("hex")}
+    1. Téléchargez les pièces-jointes à partir des liens ci-dessus
+    2. Utilisez la clé (K) et le vecteur d'initialisation (IV) suivants pour déchiffrer les pièces-jointes avec l'algorithme AES-256-CTR
+    K : ${ipfsLinks[0].encryptKey.toString("hex")}
     IV : ${ipfsLinks[0].encryptVector.toString("hex")}
     `;
 
   body = body.concat(`${decryptionInstructions}`);
+  return body;
 }
