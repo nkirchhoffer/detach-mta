@@ -1,7 +1,5 @@
 import "dotenv/config";
-import { readFile } from "fs";
-import { promisify } from "util";
-
+import { promises } from "fs";
 import CryptoJS from "crypto-js";
 const { AES, enc } = CryptoJS;
 
@@ -18,24 +16,19 @@ const filePath = process.env.CRYPTED_FILE_PATH || "010101_path_to_file_010101";
  * @returns {Promise<string>}
  */
 async function decrypt(key, iv, filePath) {
+  const encryptedBuffer = await promises.readFile(filePath);
+
   // The encrypted data as a hex string
-  const readFileP = promisify(readFile);
+  const encryptedData = encryptedBuffer.toString();
 
   // Decrypt the data
-  readFileP(filePath)
-    .then((data) => {
-      const encryptedData = data.toString();
-      // Decrypt the data
-      const decrypted = AES.decrypt(
-        enc.Hex.parse(encryptedData),
-        enc.Hex.parse(key),
-        { iv: enc.Hex.parse(iv) }
-      ).toString(enc.Utf8);
-      console.log(decrypted);
-    })
-    .catch((err) => {
-      console.log(err);
-    });
+  const decrypted = AES.decrypt(
+    enc.Hex.parse(encryptedData),
+    enc.Hex.parse(key),
+    { iv: enc.Hex.parse(iv) }
+  );
+
+  return decrypted.toString(enc.Utf8);
 }
 
 const res = await decrypt(key, iv, filePath);
