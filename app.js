@@ -1,6 +1,9 @@
 import "dotenv/config";
 import { create } from "ipfs-http-client";
-import { randomBytes, createCipheriv } from "crypto";
+
+import CryptoJS from "crypto-js";
+const { AES, enc, format, lib } = CryptoJS;
+
 import { promises } from "fs";
 const { readFile, stat } = promises;
 
@@ -36,6 +39,7 @@ try {
   console.log("Done");
 } catch (error) {
   console.error("Error raised while detaching attachments.");
+  console.error(error);
 }
 
 /**
@@ -47,15 +51,14 @@ try {
  * @returns
  */
 function encryptAttachment(object, iv, key) {
-  // Instanciez un object de code secret
-  const cipher = createCipheriv("aes-256-ctr", key, iv);
+  const keyParsed = enc.Hex.parse(key);
+  const options = { iv: enc.Hex.parse(iv), format: format.Hex };
 
-  // Crypter l'objet
-  let encryptedObj = cipher.update(object);
-  encryptedObj = Buffer.concat([encryptedObj, cipher.final()]);
+  // Encrypt the data
+  const newData = AES.encrypt(object, keyParsed, options).toString();
 
   // Return the IV, key, and encrypted object as a single buffer
-  return Buffer.concat([iv, key, encryptedObj]);
+  return newData;
 }
 
 /**
@@ -69,9 +72,9 @@ async function addAttachmentsToIPFS(attachments) {
 
   if (attachments.length > 0) {
     // Génèrez un vecteur d'initialisation (IV) aléatoire
-    const iv = randomBytes(16);
+    const iv = lib.WordArray.random(16).toString();
     // Génèrez une clé aléatoire pour le chiffrement
-    const key = randomBytes(32);
+    const key = lib.WordArray.random(32).toString();
 
     const allAsyncResultsP = [];
     // Parcourez toutes les pièces jointes du message électronique
@@ -105,7 +108,7 @@ async function addAttachmentToIPFS(iv, key, attachment) {
     const fileSize = (await stat(filePath)).size;
 
     // Lisez le fichier en mémoire
-    const fileBuffer = await readFile(filePath);
+    const fileBuffer = (await readFile(filePath)).toString();
 
     // Encryptez le fichier
     const encryptedFile = encryptAttachment(fileBuffer, iv, key);
