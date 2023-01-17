@@ -1,6 +1,9 @@
 import "dotenv/config";
-import { promises } from "fs";
-import { createDecipheriv } from "crypto";
+import { readFile } from "fs";
+import { promisify } from "util";
+
+import CryptoJS from "crypto-js";
+const { AES, enc } = CryptoJS;
 
 // The key and initialization vector as hex strings
 const key = process.env.CRYPTED_FILE_KEY || "010101_my_key_010101";
@@ -16,22 +19,23 @@ const filePath = process.env.CRYPTED_FILE_PATH || "010101_path_to_file_010101";
  */
 async function decrypt(key, iv, filePath) {
   // The encrypted data as a hex string
-  const encryptedBuffer = await promises.readFile(filePath);
-
-  // Create a decipher object
-  const decipher = createDecipheriv(
-    "aes-256-ctr",
-    Buffer.from(key, "hex"),
-    Buffer.from(iv, "hex")
-  );
+  const readFileP = promisify(readFile);
 
   // Decrypt the data
-  let decrypted = decipher.update(
-    Buffer.from(encryptedBuffer, "hex"),
-    "hex",
-    "utf8"
-  );
-  return (decrypted += decipher.final("utf8"));
+  readFileP(filePath)
+    .then((data) => {
+      const encryptedData = data.toString();
+      // Decrypt the data
+      const decrypted = AES.decrypt(
+        enc.Hex.parse(encryptedData),
+        enc.Hex.parse(key),
+        { iv: enc.Hex.parse(iv) }
+      ).toString(enc.Utf8);
+      console.log(decrypted);
+    })
+    .catch((err) => {
+      console.log(err);
+    });
 }
 
 const res = await decrypt(key, iv, filePath);
