@@ -19,20 +19,16 @@ const filePath = process.env.FILE_PATH_TO_DECRYPT || "mock/file-encrypted";
  */
 async function decrypt(key, iv, filePath) {
   try {
-      // The encrypted data as a hex string
-    const encryptedData = (await readFile(filePath)).toString();
-
-    //const options = { iv: enc.Hex.parse(iv), format: format.Hex };
+    // The encrypted data as a hex string
+    const data = (await readFile(filePath)).toString();
+    const keyParsed = enc.Hex.parse(key);
+    const options = { iv: enc.Hex.parse(iv), format: format.Hex };
 
     // Decrypt the data
-    const decrypted = AES.decrypt(
-      enc.Hex.parse(encryptedData),
-      enc.Hex.parse(key),
-      //options
-    );
+    const decrypted = AES.decrypt(data, keyParsed, options);
 
     console.log(`File decrypted successfully from ${filePath} !`);
-    return decrypted.toString(enc.Utf8);
+    return decrypted.toString(enc.Utf8); //Utf8 is important for text
   } catch (err) {
     console.error(err);
   }
