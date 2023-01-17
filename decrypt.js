@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { promises } from "fs";
-const { readFile } = promises;
+const { readFile, writeFile } = promises;
 
 import CryptoJS from "crypto-js";
 const { AES, enc, format } = CryptoJS;
@@ -15,24 +15,31 @@ const filePath = process.env.FILE_PATH_TO_DECRYPT || "mock/file-encrypted";
  * @param {string} key
  * @param {string} iv
  * @param {string} filePath
- * @returns {Promise<string>}
+ * @returns {Promise<void>}
  */
-async function decrypt(key, iv, filePath) {
+async function decryptFile(key, iv, filePath) {
+  const way = "decrypted";
   try {
     // The encrypted data as a hex string
+    // Use the readFile method to read the data to be encrypted from a local file
     const data = (await readFile(filePath)).toString();
     const keyParsed = enc.Hex.parse(key);
     const options = { iv: enc.Hex.parse(iv), format: format.Hex };
 
     // Decrypt the data
-    const decrypted = AES.decrypt(data, keyParsed, options);
+    const newData = AES.decrypt(data, keyParsed, options).toString(enc.Utf8); //Utf8 is important for text
 
-    console.log(`File decrypted successfully from ${filePath} !`);
-    return decrypted.toString(enc.Utf8); //Utf8 is important for text
+    // Use the writeFile method to write the data to a local file
+    const newPath = `${filePath}-${way}`;
+    await writeFile(newPath, newData);
+
+    console.log(newData);
+    console.log(
+      `File ${filePath} has been ${way} successfully at ${newPath} !`
+    );
   } catch (err) {
     console.error(err);
   }
 }
 
-const res = await decrypt(key, iv, filePath);
-console.log(res);
+decryptFile(key, iv, filePath);

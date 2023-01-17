@@ -18,20 +18,25 @@ const filePath = process.env.FILE_PATH_TO_CRYPT || "mock/file";
  * @returns {Promise<void>}
  */
 async function encryptFile(key, iv, filePath) {
+  const way = "encrypted";
   try {
+    // The encrypted data as a hex string
     // Use the readFile method to read the data to be encrypted from a local file
     const data = (await readFile(filePath)).toString();
     const keyParsed = enc.Hex.parse(key);
     const options = { iv: enc.Hex.parse(iv), format: format.Hex };
 
     // Encrypt the data
-    const encryptedData = AES.encrypt(data, keyParsed, options).toString();
+    const newData = AES.encrypt(data, keyParsed, options).toString();
 
-    // Use the writeFile method to write the encrypted data to a local file
-    const newPath = `${filePath}-encrypted`;
-    await writeFile(newPath, encryptedData);
+    // Use the writeFile method to write the data to a local file
+    const newPath = `${filePath}-${way}`;
+    await writeFile(newPath, newData);
 
-    console.log(`File encrypted successfully at ${newPath} !`);
+    console.log(newData);
+    console.log(
+      `File ${filePath} has been ${way} successfully at ${newPath} !`
+    );
   } catch (err) {
     console.error(err);
   }
