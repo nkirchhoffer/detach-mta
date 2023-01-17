@@ -1,7 +1,8 @@
 import "dotenv/config";
+import { create } from "ipfs-http-client";
 import { randomBytes, createCipheriv } from "crypto";
 import { promises } from "fs";
-import { create } from "ipfs-http-client";
+const { readFile, stat } = promises;
 
 // Connexion à IPFS
 const ipfsNode = create({ host: "127.0.0.1", port: "5001", protocol: "http" });
@@ -101,10 +102,10 @@ async function addAttachmentToIPFS(iv, key, attachment) {
       : attachment.filename;
 
     // Récupérez la taille du fichier
-    const fileSize = (await promises.stat(filePath)).size;
+    const fileSize = (await stat(filePath)).size;
 
     // Lisez le fichier en mémoire
-    const fileBuffer = await promises.readFile(filePath);
+    const fileBuffer = await readFile(filePath);
 
     // Encryptez le fichier
     const encryptedFile = encryptAttachment(fileBuffer, iv, key);
@@ -151,8 +152,8 @@ function modifyEmailBody(header, body, ipfsLinks) {
       Lien: ${link.url}
       Taille: ${link.size} bytes
       `;
-      // Clé: ${link.encryptKey.toString("hex")}
-      // IV: ${link.encryptVector.toString("hex")}
+    // Clé: ${link.encryptKey.toString("hex")}
+    // IV: ${link.encryptVector.toString("hex")}
     body = body.concat(`${fileDetails}`);
   });
 

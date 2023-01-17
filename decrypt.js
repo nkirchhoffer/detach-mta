@@ -1,12 +1,14 @@
 import "dotenv/config";
 import { promises } from "fs";
+const { readFile } = promises;
+
 import CryptoJS from "crypto-js";
-const { AES, enc } = CryptoJS;
+const { AES, enc, format } = CryptoJS;
 
 // The key and initialization vector as hex strings
 const key = process.env.CRYPTED_FILE_KEY || "010101_my_key_010101";
 const iv = process.env.CRYPTED_FILE_IV || "010101_my_iv_010101";
-const filePath = process.env.CRYPTED_FILE_PATH || "010101_path_to_file_010101";
+const filePath = process.env.FILE_PATH_TO_DECRYPT || "mock/file-encrypted";
 
 /**
  * To decrypt a file using the ES-256-CTR algorithm
@@ -16,19 +18,24 @@ const filePath = process.env.CRYPTED_FILE_PATH || "010101_path_to_file_010101";
  * @returns {Promise<string>}
  */
 async function decrypt(key, iv, filePath) {
-  const encryptedBuffer = await promises.readFile(filePath);
+  try {
+      // The encrypted data as a hex string
+    const encryptedData = (await readFile(filePath)).toString();
 
-  // The encrypted data as a hex string
-  const encryptedData = encryptedBuffer.toString();
+    //const options = { iv: enc.Hex.parse(iv), format: format.Hex };
 
-  // Decrypt the data
-  const decrypted = AES.decrypt(
-    enc.Hex.parse(encryptedData),
-    enc.Hex.parse(key),
-    { iv: enc.Hex.parse(iv) }
-  );
+    // Decrypt the data
+    const decrypted = AES.decrypt(
+      enc.Hex.parse(encryptedData),
+      enc.Hex.parse(key),
+      //options
+    );
 
-  return decrypted.toString(enc.Utf8);
+    console.log(`File decrypted successfully from ${filePath} !`);
+    return decrypted.toString(enc.Utf8);
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 const res = await decrypt(key, iv, filePath);
