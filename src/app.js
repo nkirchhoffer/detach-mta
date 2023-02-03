@@ -5,9 +5,8 @@ import { SMTPChannel } from 'smtp-channel';
 import SMTPComposer from 'nodemailer/lib/mail-composer/index.js';
 import Handlebars from 'handlebars';
 import { JSDOM } from 'jsdom';
-import { create } from 'ipfs-http-client';
-import fs from 'fs';
-import path from 'path';
+
+import uploadAttachments from './ipfs';
 
 const channel = new SMTPChannel({
   host: process.env.SMTP_SERVER,
@@ -20,8 +19,7 @@ const parseMail = async (stream) => {
   const parsed = await simpleParser(stream, options)
   const attachments = parsed.attachments;
 
-  const id = parsed.messageId.split('@')[0].substring(1)
-  const items = await processAttachments(id, attachments);
+  const items = await uploadAttachments(attachments);
 
   if (items.length > 0) {
     const bars = fs.readFileSync(path.join('.', 'template.html.hbs'));
@@ -37,7 +35,7 @@ const parseMail = async (stream) => {
     const body = dom.window.document.querySelector('body');
     const detachment = new JSDOM(html);
 
-    console.log("detachment.window.documen : \n" + detachment.window.document.querySelector('body'));
+    console.log("detachment.window.document : \n" + detachment.window.document.querySelector('body'));
     body.appendChild(detachment.window.document.querySelector('body'));
 
     parsed.html = dom.serialize();
@@ -46,33 +44,6 @@ const parseMail = async (stream) => {
 
   parsed.html = parsed.html;
   return parsed;
-}
-
-const processAttachments = async (_, attachments) => {
-  const ipfsNode = create({
-    host: '127.0.0.1',
-    port: '5001',
-    protocole: 'http',
-  })
-  const items = [];
-
-  const addOptions = {
-    onlyHash: false,
-    pin: true,
-    wrapWithDirectory: false,
-    timeout: 10000
-  };
-
-  for (let i = 0; i < attachments.length; i++) {
-    const attachment = attachments[i];
-    const result = await ipfsNode.add(attachment.content, addOptions)
-    const url = new URL(result.cid, process.env.IPFS_PREFIX);
-    items.push({
-      filename: attachment.filename,
-      url: url.href
-    });
-  }
-  return items;
 }
 
 const sendEmail = async (message) => {
