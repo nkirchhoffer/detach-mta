@@ -70,7 +70,7 @@ export async function sendEmail(message) {
 };
 
 export function generateBody(messageBody, items) {
-    const bars = fs.readFileSync(path.join('./templates', 'template.html.hbs'));
+    const bars = fs.readFileSync(path.join('./src/templates', 'template.html.hbs'));
     const template = Handlebars.compile(bars.toString('utf-8'));
 
     const html = template({
