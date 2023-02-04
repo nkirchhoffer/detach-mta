@@ -94,9 +94,7 @@ export function computeSize(message) {
   const bodySize = Buffer.from(message.html, 'utf-8').length;
   let attachmentSize = 0;
 
-  for (const attachment in message.attachments) {
-    attachmentSize += attachment.size;
-  }
+  message.attachments.forEach(attachment => attachmentSize += attachment.size);
 
   let headerSize = 0;
 
