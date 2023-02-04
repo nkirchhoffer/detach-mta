@@ -11,6 +11,7 @@ const parseMail = async (stream) => {
   const options = {};
   const parsed = await simpleParser(stream, options);
 
+  console.log(`Taille du mail entrant: ${computeSize(parsed)}`);
   incrementEmailCounter();
   observeInbound(computeSize(parsed));
 

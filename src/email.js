@@ -92,7 +92,12 @@ export function generateBody(messageBody, items) {
 export function computeSize(message) {
 
   const bodySize = Buffer.from(message.html, 'utf-8').length;
-  const attachmentSize = message.attachments.reduce((size, attachment) => size + attachment.size);
+  let attachmentSize = 0;
+
+  for (const attachment in message.attachments) {
+    attachmentSize += attachment.size;
+  }
+
   let headerSize = 0;
 
   for (const [_, value] in message.headers) {
