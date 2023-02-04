@@ -6,7 +6,7 @@ import SMTPComposer from 'nodemailer/lib/mail-composer/index.js';
 import Handlebars from 'handlebars';
 import { JSDOM } from 'jsdom';
 
-import uploadAttachments from './ipfs';
+import uploadAttachments from './ipfs.js';
 
 const channel = new SMTPChannel({
   host: process.env.SMTP_SERVER,
