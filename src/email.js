@@ -10,7 +10,7 @@ const handler = console.log;
 import Handlebars from 'handlebars';
 import { JSDOM } from 'jsdom';
 
-export default async function sendEmail(message) {
+export async function sendEmail(message) {
     const mail = new SMTPComposer({
         to: message.to.text,
         from: message.from.text,
@@ -66,7 +66,7 @@ export default async function sendEmail(message) {
       console.log(`Message ${message.subject} sent successfully`);
 };
 
-export default function generateBody(messageBody, items) {
+export function generateBody(messageBody, items) {
     const bars = fs.readFileSync(path.join('./templates', 'template.html.hbs'));
     const template = Handlebars.compile(bars.toString('utf-8'));
 
