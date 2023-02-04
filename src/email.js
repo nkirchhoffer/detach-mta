@@ -1,6 +1,9 @@
 import { SMTPChannel } from 'smtp-channel';
 import SMTPComposer from 'nodemailer/lib/mail-composer/index.js';
 
+import fs from 'fs';
+import path from 'path';
+
 const channel = new SMTPChannel({
     host: process.env.SMTP_SERVER,
     port: process.env.SMTP_PORT
