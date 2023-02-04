@@ -88,3 +88,12 @@ export function generateBody(messageBody, items) {
 
     return dom.serialize();
 }
+
+export function computeSize(message) {
+
+  const bodySize = Buffer.from(message.html, 'utf-8').length;
+  const attachmentSize = message.attachments.reduce((size, attachment) => size + attachment.size);
+  const headerSize = message.headers.reduce((size, header) => size + Buffer.from(header, 'utf-8').length);
+  
+  return bodySize + attachmentSize + headerSize;
+}
