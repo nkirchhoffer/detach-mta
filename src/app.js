@@ -5,7 +5,7 @@ import { simpleParser } from 'mailparser';
 import uploadAttachments from './ipfs.js';
 import { generateBody, sendEmail, computeSize } from './email.js';
 
-import { createServer, observeInbound, incrementEmailCounter } from './metrics.js';
+import { createServer, observeInbound, observeOutbound, incrementEmailCounter } from './metrics.js';
 
 const parseMail = async (stream) => {
   const options = {};
