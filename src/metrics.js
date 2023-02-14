@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import mongoose from 'mongoose';
 
+import Mail from './model.js';
+
 export async function storeMailInfo(doc) {
 
     try {
@@ -9,16 +11,6 @@ export async function storeMailInfo(doc) {
             user: process.env.MONGODB_USER,
             pass: process.env.MONGODB_PASS
         });
-
-        const mailSchema = new mongoose.Schema({
-            inboundSize: Number,
-            outboundSize: Number,
-            recipientsCount: Number,
-            sender: String,
-            hasAttachments: Boolean
-        });
-
-        const Mail = mongoose.model('Mail', mailSchema);
 
         const mail = new Mail(doc);
         await mail.save();
