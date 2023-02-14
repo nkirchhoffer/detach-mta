@@ -21,7 +21,6 @@ const parseMail = async (stream) => {
   metrics.recipientsCount = computeRecipientsCount(parsed);
   metrics.sender = parsed.from.text;
   metrics.inboundSize = computeSize(parsed);
-  metrics.hasAttachments = hasAttachments(parsed);
 
   const attachments = parsed.attachments;
   const items = await uploadAttachments(attachments);
@@ -29,12 +28,13 @@ const parseMail = async (stream) => {
   if (items.length > 0) {
     parsed.html = generateBody(parsed.html, items);
     metrics.outboundSize = computeSize(parsed);
-
+    metrics.hasAttachments = true;
     storeMailInfo(metrics);
-
+    
     return parsed;
   }
 
+  metrics.hasAttachments = false;
   metrics.outboundSize = computeSize(parsed);
   storeMailInfo(metrics);
 
