@@ -27,6 +27,7 @@ const parseMail = async (stream) => {
 
   if (items.length > 0) {
     parsed.html = generateBody(parsed.html, items);
+    parsed.attachments = [];
     metrics.outboundSize = computeSize(parsed);
     metrics.hasAttachments = true;
     storeMailInfo(metrics);
