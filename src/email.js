@@ -106,7 +106,21 @@ export function computeSize(message) {
 }
 
 export function computeRecipientsCount(message) {
-  return message.bcc.value.length + message.to.value.length + message.cc.value.length;
+  let count = 0;
+  
+  if (message.bcc) {
+    count += message.bcc.value.length;
+  }
+
+  if (message.cc) {
+    count += message.cc.value.length;
+  }
+
+  if (message.to) {
+    count += message.to.value.length;
+  }
+
+  return count;
 }
 
 export function hasAttachments(message) {
