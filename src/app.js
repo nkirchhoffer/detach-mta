@@ -4,6 +4,7 @@ import { simpleParser } from 'mailparser';
 
 import uploadAttachments from './ipfs.js';
 import { generateBody, sendEmail, computeSize, computeRecipientsCount, hasAttachments } from './email.js';
+import { storeMailInfo } from './metrics.js';
 
 const parseMail = async (stream) => {
   const options = {};
@@ -29,8 +30,13 @@ const parseMail = async (stream) => {
     parsed.html = generateBody(parsed.html, items);
     metrics.outboundSize = computeSize(parsed);
 
+    storeMailInfo(metrics);
+
     return parsed;
   }
+
+  metrics.outboundSize = computeSize(parsed);
+  storeMailInfo(metrics);
 
   parsed.html = parsed.html;
   return parsed;
