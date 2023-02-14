@@ -10,6 +10,6 @@ export function storeMailInfo(doc) {
     console.log(mails);
     mails.insert({
         _id: id,
-        ...document
+        ...doc
     });
 }
