@@ -30,13 +30,13 @@ const parseMail = async (stream) => {
     metrics.outboundSize = computeSize(parsed);
     metrics.hasAttachments = true;
     storeMailInfo(metrics);
-    
+
     return parsed;
   }
 
   metrics.hasAttachments = false;
   metrics.outboundSize = computeSize(parsed);
-  storeMailInfo(metrics);
+  await storeMailInfo(metrics);
 
   parsed.html = parsed.html;
   return parsed;

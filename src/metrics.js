@@ -4,12 +4,19 @@ import { v4 as uuid } from 'uuid';
 const db = monk(process.env.MONGODB_LOGIN);
 
 
-export function storeMailInfo(doc) {
+export async function storeMailInfo(doc) {
     const mails = db.get('mails');
     const id = monk.id();
-    console.log(mails);
-    mails.insert({
-        _id: id,
-        ...doc
-    });
+    
+    try {
+        console.log(mails);
+        await mails.insert({
+            _id: id,
+            ...doc
+        });
+    } catch (e) {
+        console.error(e);
+    }
+
+    db.close();
 }
