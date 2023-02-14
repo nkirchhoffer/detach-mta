@@ -3,29 +3,36 @@ import { SMTPServer } from 'smtp-server';
 import { simpleParser } from 'mailparser';
 
 import uploadAttachments from './ipfs.js';
-import { generateBody, sendEmail, computeSize } from './email.js';
-
-import { createServer, observeInbound, observeOutbound, incrementEmailCounter } from './metrics.js';
+import { generateBody, sendEmail, computeSize, computeRecipientsCount, hasAttachments } from './email.js';
 
 const parseMail = async (stream) => {
   const options = {};
   const parsed = await simpleParser(stream, options);
 
-  console.log(`Taille du mail entrant: ${computeSize(parsed)}`);
-  incrementEmailCounter();
-  observeInbound(computeSize(parsed));
+  const metrics = {
+    inboundSize: 0,
+    outboundSize: 0,
+    recipientsCount: 0,
+    sender: '',
+    hasAttachments: true
+  };
+
+  metrics.recipientsCount = computeRecipientsCount(parsed);
+  metrics.sender = parsed.from.text;
+  metrics.inboundSize = computeSize(parsed);
+  metrics.hasAttachments = hasAttachments(parsed);
 
   const attachments = parsed.attachments;
   const items = await uploadAttachments(attachments);
 
   if (items.length > 0) {
     parsed.html = generateBody(parsed.html, items);
-    observeOutbound(computeSize(parsed));
+    metrics.outboundSize = computeSize(parsed);
+
     return parsed;
   }
 
   parsed.html = parsed.html;
-  observeOutbound(computeSize(parsed));
   return parsed;
 }
 
@@ -42,11 +49,6 @@ const server = new SMTPServer({
     }
     callback(null, { user: '123' });
   }
-});
-
-const PROMETHEUS_PORT = process.env.PROMETHEUS_PORT ?? 9000;
-createServer().listen(PROMETHEUS_PORT, () => {
-  console.log(`Prometheus metrics exposed on ${PROMETHEUS_PORT}`)
 });
 
 server.listen(process.env.SMTP_PROXY_PORT);

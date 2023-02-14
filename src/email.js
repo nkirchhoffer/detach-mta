@@ -91,7 +91,7 @@ export function generateBody(messageBody, items) {
 
 export function computeSize(message) {
 
-  const bodySize = Buffer.from(message.html, 'utf-8').length;
+  const bodySize = Buffer.from(message.html, 'utf-8').length; // length en bytes
   let attachmentSize = 0;
 
   message.attachments.forEach(attachment => attachmentSize += attachment.size);
@@ -103,4 +103,12 @@ export function computeSize(message) {
   }
   
   return bodySize + attachmentSize + headerSize;
+}
+
+export function computeRecipientsCount(message) {
+  return message.bcc.value.length + message.to.value.length + message.cc.value.length;
+}
+
+export function hasAttachments(message) {
+  return message.attachments.length === 0 ? false : true;
 }
