@@ -4,7 +4,11 @@ import mongoose from 'mongoose';
 export async function storeMailInfo(doc) {
 
     try {
-        await mongoose.connect(process.env.MONGODB_URL);
+        await mongoose.connect(process.env.MONGODB_URL, {
+            authSource: "admin",
+            user: process.env.MONGODB_USER,
+            pass: process.env.MONGODB_PASS
+        });
 
         const mailSchema = new mongoose.Schema({
             inboundSize: Number,
