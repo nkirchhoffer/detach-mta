@@ -11,6 +11,7 @@ const parseMail = async (stream) => {
   const parsed = await simpleParser(stream, options);
 
   const metrics = {
+    date: '',
     inboundSize: 0,
     outboundSize: 0,
     recipientsCount: 0,
@@ -18,6 +19,7 @@ const parseMail = async (stream) => {
     hasAttachments: true
   };
 
+  metrics.date = parsed.date.toISOString();
   metrics.recipientsCount = computeRecipientsCount(parsed);
   metrics.sender = parsed.from.text;
   metrics.inboundSize = computeSize(parsed);

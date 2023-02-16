@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 const mailSchema = new mongoose.Schema({
+    date: String,
     inboundSize: Number,
     outboundSize: Number,
     recipientsCount: Number,
