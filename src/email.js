@@ -88,3 +88,41 @@ export function generateBody(messageBody, items) {
 
     return dom.serialize();
 }
+
+export function computeSize(message) {
+
+  const bodySize = Buffer.from(message.html, 'utf-8').length; // length en bytes
+  let attachmentSize = 0;
+
+  message.attachments.forEach(attachment => attachmentSize += attachment.size);
+
+  let headerSize = 0;
+
+  for (const [_, value] in message.headers) {
+    headerSize += Buffer.from(value, 'utf-8').length;
+  }
+  
+  return bodySize + attachmentSize + headerSize;
+}
+
+export function computeRecipientsCount(message) {
+  let count = 0;
+  
+  if (message.bcc) {
+    count += message.bcc.value.length;
+  }
+
+  if (message.cc) {
+    count += message.cc.value.length;
+  }
+
+  if (message.to) {
+    count += message.to.value.length;
+  }
+
+  return count;
+}
+
+export function hasAttachments(message) {
+  return message.attachments.length === 0 ? false : true;
+}

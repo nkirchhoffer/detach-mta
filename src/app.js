@@ -3,20 +3,43 @@ import { SMTPServer } from 'smtp-server';
 import { simpleParser } from 'mailparser';
 
 import uploadAttachments from './ipfs.js';
-import { generateBody, sendEmail } from './email.js';
-
+import { generateBody, sendEmail, computeSize, computeRecipientsCount, hasAttachments } from './email.js';
+import { storeMailInfo } from './metrics.js';
 
 const parseMail = async (stream) => {
   const options = {};
-  const parsed = await simpleParser(stream, options)
-  const attachments = parsed.attachments;
+  const parsed = await simpleParser(stream, options);
 
+  const metrics = {
+    date: '',
+    inboundSize: 0,
+    outboundSize: 0,
+    recipientsCount: 0,
+    sender: '',
+    hasAttachments: true
+  };
+
+  metrics.date = parsed.date.toISOString();
+  metrics.recipientsCount = computeRecipientsCount(parsed);
+  metrics.sender = parsed.from.text;
+  metrics.inboundSize = computeSize(parsed);
+
+  const attachments = parsed.attachments;
   const items = await uploadAttachments(attachments);
 
   if (items.length > 0) {
     parsed.html = generateBody(parsed.html, items);
+    parsed.attachments = [];
+    metrics.outboundSize = computeSize(parsed);
+    metrics.hasAttachments = true;
+    storeMailInfo(metrics);
+
     return parsed;
   }
+
+  metrics.hasAttachments = false;
+  metrics.outboundSize = computeSize(parsed);
+  await storeMailInfo(metrics);
 
   parsed.html = parsed.html;
   return parsed;
@@ -37,4 +60,4 @@ const server = new SMTPServer({
   }
 });
 
-server.listen(9830);
+server.listen(process.env.SMTP_PROXY_PORT);
